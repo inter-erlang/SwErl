@@ -25,7 +25,7 @@ final class SwErlTests: XCTestCase {
     
     
     func testHappyPathSpawnStateless() throws {
-        let Pid = try? spawn{(procName, message) in
+        let Pid = try? spawn{(PID, message) in
             return true
         }
         XCTAssertNotNil(Pid)
