@@ -2,10 +2,12 @@ import XCTest
 @testable import SwErl
 
 final class SwErlTests: XCTestCase {
+    
     override func setUp() {
         // This is the setUp() instance method.
         // XCTest calls it before each test method.
         // Set up any synchronous per-test state here.
+        registry = Registrar()
         for key in registry!.getAllPIDs(){
             registry!.remove(key)
         }
@@ -18,6 +20,7 @@ final class SwErlTests: XCTestCase {
         for key in registry!.getAllPIDs(){
             registry!.remove(key)
         }
+        registry = nil
      }
     
     
@@ -70,6 +73,22 @@ final class SwErlTests: XCTestCase {
         XCTAssertNotNil(stateless.statelessLambda)
         XCTAssertTrue(stateless.statelessLambda!(bingo,3))
     }
+    func testThrowingStatelessSwerlProcessWithDefaults() throws {
+        let bingo = UUID()
+        let stateless = try SwErlProcess(registrationID: bingo){(name, message) throws in
+            if message as! Int == 4{
+                throw SwErlError.missingRegistry
+            }
+            return true
+        }
+        XCTAssertNil(stateless.statelessLambda)
+        XCTAssertNil(stateless.state)
+        XCTAssertEqual(stateless.queue, DispatchQueue.global())
+        XCTAssertEqual(stateless.registeredPid, bingo)
+        XCTAssertNotNil(stateless.throwingStatelessLambda)
+        XCTAssertTrue(try stateless.throwingStatelessLambda!(bingo,3))
+        XCTAssertThrowsError(try stateless.throwingStatelessLambda!(bingo,4))
+    }
     
     func testStatelessSwerlProcessNoDefaults() throws {
         let mainBingo = UUID()
@@ -99,14 +118,33 @@ final class SwErlTests: XCTestCase {
         XCTAssertNotNil(stateful.statefulLambda)
         XCTAssertTrue(stateful.statefulLambda!(hasState,"butter",["salt","water"]) as!(Bool,[String]) == (true,["salt","water","butter"]))
     }
-    
-    func testStatefulSwerlProcessNoDefaults() throws {
+    func testThrowingStatefulSwerlProcessWithDefaults() throws {
         let hasState = UUID()
-        let stateful:SwErlProcess = try! SwErlProcess(queueToUse:DispatchQueue.main,registeredPid: hasState,initialState: ["eggs","flour"]){(procName, message ,state) in
+        let stateful:SwErlProcess = try! SwErlProcess(registeredPid: hasState,initialState: ["eggs","flour"]){(procName, message ,state) throws in
+            if message as! String == "oops"{
+                throw SwErlError.missingRegistry
+            }
             var updatedState:[String] = state as![String]
             updatedState.append(message as! String)
             return (true,updatedState)
         }
+        XCTAssertNil(stateful.statefulLambda)
+        XCTAssertNotNil(stateful.state)
+         XCTAssertTrue(["eggs","flour"] == stateful.state as! [String])
+        XCTAssertEqual(stateful.queue, DispatchQueue.global())
+        XCTAssertEqual(stateful.registeredPid, hasState)
+        XCTAssertNotNil(stateful.throwingStatefulLambda)
+        XCTAssertTrue(try stateful.throwingStatefulLambda!(hasState,"butter",["salt","water"]) as!(Bool,[String]) == (true,["salt","water","butter"]))
+        XCTAssertThrowsError(try stateful.throwingStatefulLambda!(hasState,"oops",["salt","water"]) as!(Bool,[String]) == (true,["salt","water","butter"]))
+    }
+    
+    func testStatefulSwerlProcessNoDefaults() throws {
+        let hasState = UUID()
+        let stateful:SwErlProcess = try! SwErlProcess(queueToUse:DispatchQueue.main,registeredPid: hasState,initialState: ["eggs","flour"]){(procName, message ,state) in
+                var updatedState:[String] = state as![String]
+                updatedState.append(message as! String)
+                return (true,updatedState)
+            }
         XCTAssertNil(stateful.statelessLambda)
         XCTAssertNotNil(stateful.state)
          XCTAssertTrue(["eggs","flour"] == stateful.state as! [String])
