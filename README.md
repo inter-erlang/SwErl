@@ -10,23 +10,23 @@ SwErl is based on a spawn-send pattern. You spawn a closure. Then somewhere else
 
 The spawn-send pattern also frees you from worrying about shared states between threads. That way you never have to worry about race conditions. Ever! Being freed from race conditions means you don't ever have to create semiphores or locks. Being freed from these means your code can never experience a cross-lock. These pain-points of parallel and concurrent programming are now gone! 
 
-##Brief Usage Introduction
+## Brief Usage Introduction
 Here is a simple example. It uses the main DispatchQueue. When executed, the closure prints out the SwErl process ID, not thread id, and whatever message is sent. Messages can be any valid Swift type. It could be a tuple, struct instance, class instance, string, Int, or any custom type in your application. It could even be another closure if you wanted. 
 ```swift
-            let examplePid = try spawn{(procPid, message) in
-                print("process: \(procPid) message: \(message)")
-                return SwErlProc.continue
-            }
+let examplePid = try spawn{(procPid, message) in
+    print("process: \(procPid) message: \(message)")
+    return SwErlProc.continue
+}
 ```
 The <code>spawn</code> function registers your closure in a local registry. The value of this function is a process ID. A pid. Once registered, the pid can be used to send messages to the closure from <bold>anywhere</bold> in your code.
 
 Let's send a simple <code>String</code>-type message to the example closure above. 
 ```swift    
-    examplePid ! "Hi there."
+examplePid ! "Hi there."
 ```
 The <code>!</code> send operator is all that's needed. Now let's send a tuple.
 ```swift
-    examplePid ! (7,3.5,"Sue")
+examplePid ! (7,3.5,"Sue")
 ```
 
 You can send a message that includes any valid Swift type, including Pids. That means not only can you capture pids in a closure, you can pass them as part of a message. This gives you an ultimate way of chainging closures.
@@ -44,7 +44,7 @@ Also, since the <code>spawn</code> function accepts both functions and closures,
 
 I look forward to seeing how you leverage this dynamic parallelism and concurrency library in your products.
 
-###SwErl Process Types 
+### SwErl Process Types 
 
 There are two types of SwErl processes you can spawn, stateless and stateful.
 ### Stateless SwErl Processes
