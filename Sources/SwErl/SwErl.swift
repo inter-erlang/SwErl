@@ -8,6 +8,7 @@
 import Foundation
 
 
+
 /// <#Description#>
 enum SwErlError: Error {
     case processAlreadyRegistered//there is a process currently registered with that name
@@ -51,12 +52,23 @@ extension UUID{
             return
         }
         if var process = registry.getProcess(forID: lhs){
+            if let statefulClosure = process.statefulLambda{
+                do{
+                    process.state = try process.queue.sync(execute:{()throws->Any in
+                        return statefulClosure(process.registeredPid,process.state!,rhs)
+                    })
+                }
+                catch{
+                    print("PID \(process.registeredPid) threw an error. SwErl processes are to deal with any throws that happen within themselves.")
+                }
             
-            process.queue.async {
-                
-                if let stateful = process.statefulLambda{
-                    let state = stateful( process.registeredPid, process.state ?? (),rhs)
-                    process.state = state
+            }
+            else{
+                if let statelessClosure = process.statelessLambda{
+                    process.queue.async {
+                        statelessClosure(process.registeredPid,rhs)
+                        
+                    }
                 }
             }
         }
@@ -65,7 +77,7 @@ extension UUID{
 
 
 
-internal struct SwErlProcessd{
+internal struct SwErlProcess{
     var queue: DispatchQueue
     
     ///
@@ -79,9 +91,9 @@ internal struct SwErlProcessd{
     var state:Any?
     let registeredPid:UUID
     
-    init(queueToUse:DispatchQueue = DispatchQueue.global(),
+    init(queueToUse:DispatchQueue = statefulProcessDispatchQueue,
          registeredPid:UUID,
-         initialState:Any? = nil,
+         initialState:Any,
          functionality: @escaping @Sendable (UUID,Any,Any) -> Any) throws {//the returned value is used as the next state.
         self.queue = queueToUse
         self.statefulLambda = functionality
@@ -127,5 +139,5 @@ internal struct Registrar{
 
 internal var registry:Registrar? = nil
 
-
+internal let statefulProcessDispatchQueue = DispatchQueue(label: "statefulDispatchQueue",qos: .default)
 

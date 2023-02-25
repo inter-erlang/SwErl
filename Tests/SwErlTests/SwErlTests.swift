@@ -97,7 +97,7 @@ final class SwErlTests: XCTestCase {
         XCTAssertNil(stateful.statelessLambda)
         XCTAssertNotNil(stateful.state)
          XCTAssertTrue(["eggs","flour"] == stateful.state as! [String])
-        XCTAssertEqual(stateful.queue, DispatchQueue.global())
+        XCTAssertEqual(stateful.queue, statefulProcessDispatchQueue)
         XCTAssertEqual(stateful.registeredPid, hasState)
         XCTAssertNotNil(stateful.statefulLambda)
         XCTAssertTrue(stateful.statefulLambda!(hasState,"butter",["salt","water"]) as!(Bool,[String]) == (true,["salt","water","butter"]))
@@ -160,5 +160,35 @@ final class SwErlTests: XCTestCase {
         XCTAssertNoThrow(registry!.remove(second))
         XCTAssertNil(registry!.getProcess(forID: second))
         XCTAssertEqual(2, registry!.getAllPIDs().count)
+        
+    }
+    
+    @available(macOS 13.0, *)
+    func testSizeAndSpeed() throws{
+        
+        print("\n\n\n!!!!!!!!!!!!!!!!!!! size of SwErlProcess: \(MemoryLayout<SwErlProcess>.size ) bytes")
+        
+        let stateless = {(procName:UUID, message:Any) in
+            return
+        }
+        let stateful = {(pid:UUID,state:Any,message:Any)->Any in
+            return 7
+        }
+        let timer = ContinuousClock()
+        let count:Int64 = 1000000
+        var time = try timer.measure{
+            for _ in 0..<count{
+                _ = try spawn(function: stateless)
+            }
+        }
+        print("stateless spawning took \(time.components.attoseconds/count) attoseconds per instantiation")
+        
+        time = try timer.measure{
+            for _ in 0..<count{
+                _ = try spawn(initialState: 7, function: stateful)
+            }
+        }
+        print("stateful spawning took \(time.components.attoseconds/count) attoseconds per instantiation\n\n\n")
+        
     }
 }
