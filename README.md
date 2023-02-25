@@ -1,4 +1,5 @@
 # SwErl
+##This software is in Alpha form. Large, Significant changes are and will be made as it moves toward its first release.
 
 Parallel and concurrent computing should not be hard! SwErl is a small package that reduces not only the difficulty of thinking about concurrency, but also how much code you have to write.
 
