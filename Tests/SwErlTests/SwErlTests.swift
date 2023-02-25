@@ -26,7 +26,7 @@ final class SwErlTests: XCTestCase {
     
     func testHappyPathSpawnStateless() throws {
         let Pid = try? spawn{(PID, message) in
-            return true
+            return
         }
         XCTAssertNotNil(Pid)
         
@@ -45,7 +45,7 @@ final class SwErlTests: XCTestCase {
         let anID = UUID()
         
         let stateless = try SwErlProcess(registrationID: anID){(name, message) in
-            return false
+            return
         }
         XCTAssertNoThrow(try registry!.register(stateless, PID: anID))
         XCTAssertNoThrow(anID ! "hello")
@@ -53,7 +53,7 @@ final class SwErlTests: XCTestCase {
         
         let stopperID = UUID()
         let stopper = try SwErlProcess(registrationID: stopperID){(name, message) in
-            return true
+            return
         }
         XCTAssertNoThrow(try registry!.register(stopper, PID: stopperID))
         XCTAssertNoThrow(stopperID ! "hello")
@@ -64,27 +64,27 @@ final class SwErlTests: XCTestCase {
     func testStatelessSwerlProcessWithDefaults() throws {
         let bingo = UUID()
         let stateless = try SwErlProcess(registrationID: bingo){(name, message) in
-            return true
+            return
         }
         XCTAssertNil(stateless.statefulLambda)
         XCTAssertNil(stateless.state)
         XCTAssertEqual(stateless.queue, DispatchQueue.global())
         XCTAssertEqual(stateless.registeredPid, bingo)
         XCTAssertNotNil(stateless.statelessLambda)
-        XCTAssertTrue(stateless.statelessLambda!(bingo,3))
+        XCTAssertNoThrow(stateless.statelessLambda!(bingo,3))
     }
     
     func testStatelessSwerlProcessNoDefaults() throws {
         let mainBingo = UUID()
         let stateless = try SwErlProcess(queueToUse:DispatchQueue.main, registrationID: mainBingo){(name, message) in
-            return false
+            return
         }
         XCTAssertNil(stateless.statefulLambda)
         XCTAssertNil(stateless.state)
         XCTAssertEqual(stateless.queue, DispatchQueue.main)
         XCTAssertEqual(stateless.registeredPid, mainBingo)
         XCTAssertNotNil(stateless.statelessLambda)
-        XCTAssertFalse(stateless.statelessLambda!(mainBingo,3))
+        XCTAssertNoThrow(stateless.statelessLambda!(mainBingo,3))
     }
     
     func testStatefulSwerlProcessWithDefaults() throws {
@@ -125,13 +125,13 @@ final class SwErlTests: XCTestCase {
         let third = UUID()
         XCTAssertEqual(registry!.registeredProcesses.count, 0)
         let firstProc = try SwErlProcess(registrationID: first){(procName, message) in
-            return true
+            return
         }
         let secondProc = try SwErlProcess(registrationID: second){(procName, message) in
-            return true
+            return
         }
         let thirdProc = try SwErlProcess(registrationID: third){(procName, message) in
-            return true
+            return
         }
         XCTAssertNil(registry!.registeredProcesses[first])
         XCTAssertNil(registry!.registeredProcesses[second])

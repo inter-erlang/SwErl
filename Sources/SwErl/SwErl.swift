@@ -7,15 +7,6 @@
 
 import Foundation
 
-enum SwErlProc{
-    static let `continue` = false
-    static let stop = true
-    static let nilMessage:String = "nil"
-}
-
-enum SwErlDef{
-    case none
-}
 
 /// <#Description#>
 enum SwErlError: Error {
@@ -24,7 +15,7 @@ enum SwErlError: Error {
 }
 
 
-func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),function:@escaping @Sendable(UUID,Any)->Bool)throws -> UUID {
+func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),function:@escaping @Sendable(UUID,Any)->Void)throws -> UUID {
     guard var registry = registry else{
         throw SwErlError.missingRegistry
     }
@@ -36,7 +27,7 @@ func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),function:@escaping 
 //The state can be any valid Swift type, a tuple, a list, a dictionary, etc.
 ///
 ///The function or lambda passed will be run on a DispatchQueue. The default value is the global dispactch queue with a quality of service of .default.
-func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),initialState:Any,function:@escaping @Sendable(UUID,Any,Any)-> (Bool,Any))throws -> UUID {
+func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),initialState:Any,function:@escaping @Sendable(UUID,Any,Any)-> Any)throws -> UUID {
     guard var registry = registry else{
         throw SwErlError.missingRegistry
     }
@@ -55,7 +46,7 @@ func startLocalRegistry(){
 infix operator ! : ComparisonPrecedence
 extension UUID{
     static func !( lhs: UUID, rhs: Any) {
-        guard var registry = registry else{
+        guard let registry = registry else{
             NSLog("no registry started")
             return
         }
@@ -63,20 +54,9 @@ extension UUID{
             
             process.queue.async {
                 
-                var shouldStop = SwErlProc.stop
                 if let stateful = process.statefulLambda{
-                    let (possiblyStop,state) = stateful( process.registeredPid, process.state ?? (),rhs)
-                    shouldStop = possiblyStop
+                    let state = stateful( process.registeredPid, process.state ?? (),rhs)
                     process.state = state
-                }
-                else{
-                    shouldStop = process.statelessLambda!(process.registeredPid, rhs)
-                }
-                //Only ephemeral processes would ever be
-                //removed from the registrar. These would
-                //be an exceptional, not default, behavior.
-                if shouldStop == SwErlProc.stop{
-                    registry.remove(process.registeredPid)
                 }
             }
         }
@@ -85,29 +65,24 @@ extension UUID{
 
 
 
-internal struct SwErlProcess{
+internal struct SwErlProcessd{
     var queue: DispatchQueue
     
     ///
     ///this lambda has three parameters, self(the process' registered name), state and message.
-    ///It has a value tuple of (should_stop, next_state).
-    ///Should_stop is a Bool
     ///
-    var statefulLambda:((UUID, Any?,Any?)->(Bool,Any))? = nil
-    var throwingStatefulLambda:((UUID, Any?,Any?)throws->(Bool,Any))? = nil
+    var statefulLambda:((UUID, Any,Any)->Any)? = nil
     ///
     ///this lambda has two parameters. The first is the registered
     ///name, self, and the second is the message
-    ///It has a value of should_stop that is a Bool.
-    var statelessLambda:((UUID, Any?)->Bool)? = nil
-    var throwingStatelessLambda:((UUID, Any?)throws->Bool)? = nil
+    var statelessLambda:((UUID, Any)->Void)? = nil
     var state:Any?
     let registeredPid:UUID
     
     init(queueToUse:DispatchQueue = DispatchQueue.global(),
          registeredPid:UUID,
          initialState:Any? = nil,
-         functionality: @escaping @Sendable (UUID,Any,Any) -> (Bool,Any) ) throws {//the returned value is used as the next state.
+         functionality: @escaping @Sendable (UUID,Any,Any) -> Any) throws {//the returned value is used as the next state.
         self.queue = queueToUse
         self.statefulLambda = functionality
         self.state = initialState
@@ -117,7 +92,7 @@ internal struct SwErlProcess{
     
     init(queueToUse:DispatchQueue = DispatchQueue.global(),
          registrationID:UUID,
-         functionality: @escaping @Sendable (UUID,Any) -> Bool ) throws{
+         functionality: @escaping @Sendable (UUID,Any) -> Void ) throws{
         self.queue = queueToUse
         self.statelessLambda = functionality
         self.state = nil
