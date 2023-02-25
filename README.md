@@ -29,7 +29,7 @@ The <code>!</code> send operator is all that's needed. Now let's send a tuple.
 examplePid ! (7,3.5,"Sue")
 ```
 
-You can send a message that includes any valid Swift type, including Pids. That means not only can you capture pids in a closure, you can pass them as part of a message. This gives you an ultimate way of chainging closures.
+You can send a message that includes any valid Swift type, including Pids. That means not only can you capture pids in a closure, you can pass them as part of a message. This gives you an ultimate way of chainging closures without using any callbacks!
 
 ## Detailed Usage Explanation
 
