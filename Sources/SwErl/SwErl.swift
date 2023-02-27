@@ -12,16 +12,14 @@ import Foundation
 /// <#Description#>
 enum SwErlError: Error {
     case processAlreadyRegistered//there is a process currently registered with that name
-    case missingRegistry
 }
 
 
 func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),function:@escaping @Sendable(UUID,Any)->Void)throws -> UUID {
-    guard var registry = registry else{
-        throw SwErlError.missingRegistry
-    }
+    
     var PID = UUID()
-    PID = try registry.register(SwErlProcess(registrationID: PID, functionality: function),PID: PID)
+    PID = try Registrar.register(SwErlProcess(registrationID: PID, functionality: function),PID: PID)
+    Registrar.instance = Registrar.instance//update the global Registrar.instance
     return PID
 }
 //spawn a process with an initial state.
@@ -29,34 +27,24 @@ func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),function:@escaping 
 ///
 ///The function or lambda passed will be run on a DispatchQueue. The default value is the global dispactch queue with a quality of service of .default.
 func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),initialState:Any,function:@escaping @Sendable(UUID,Any,Any)-> Any)throws -> UUID {
-    guard var registry = registry else{
-        throw SwErlError.missingRegistry
-    }
     var PID = UUID()
-    PID = try registry.register(SwErlProcess(registeredPid: PID, initialState: initialState, functionality: function), PID: PID)
+    PID = try Registrar.register(SwErlProcess(registeredPid: PID, initialState: initialState, functionality: function), PID: PID)
     return PID
 }
 
-
-func startLocalRegistry(){
-    registry = Registrar()
-}
 
 //If a stateful process has nil as it's state, the stateful
 //lambda will be passed an empty tuple as the state to use.
 infix operator ! : ComparisonPrecedence
 extension UUID{
     static func !( lhs: UUID, rhs: Any) {
-        guard let registry = registry else{
-            NSLog("no registry started")
-            return
-        }
-        if var process = registry.getProcess(forID: lhs){
+        if var process = Registrar.getProcess(forID: lhs){
             if let statefulClosure = process.statefulLambda{
                 do{
                     process.state = try process.queue.sync(execute:{()throws->Any in
-                        return statefulClosure(process.registeredPid,process.state!,rhs)
+                        return statefulClosure(lhs,process.state!,rhs)
                     })
+                    Registrar.instance.registeredProcesses[lhs] = process
                 }
                 catch{
                     print("PID \(process.registeredPid) threw an error. SwErl processes are to deal with any throws that happen within themselves.")
@@ -113,23 +101,24 @@ internal struct SwErlProcess{
 }
 
 internal struct Registrar{
+    static var instance:Registrar = Registrar()
     var registeredProcesses:[UUID:SwErlProcess] = [:]
-    mutating func register(_ toBeAdded:SwErlProcess, PID:UUID)throws -> UUID{
-        guard self.getProcess(forID: PID) == nil else{
+    static func register(_ toBeAdded:SwErlProcess, PID:UUID)throws -> UUID{
+        guard Registrar.getProcess(forID: PID) == nil else{
             throw SwErlError.processAlreadyRegistered
         }
-        registeredProcesses.updateValue(toBeAdded, forKey: PID)
+        instance.registeredProcesses.updateValue(toBeAdded, forKey: PID)
         return PID
     }
     
-    mutating func remove(_ registrationID:UUID){
-        registeredProcesses.removeValue(forKey: registrationID)
+    static func remove(_ registrationID:UUID){
+        instance.registeredProcesses.removeValue(forKey: registrationID)
     }
-    func getProcess(forID:UUID)->SwErlProcess?{
-        return registeredProcesses[forID]
+    static func getProcess(forID:UUID)->SwErlProcess?{
+        return instance.registeredProcesses[forID]
     }
-    func getAllPIDs()->Dictionary<UUID, SwErlProcess>.Keys{
-        return registeredProcesses.keys
+    static func getAllPIDs()->Dictionary<UUID, SwErlProcess>.Keys{
+        return instance.registeredProcesses.keys
     }
 }
 
@@ -137,7 +126,7 @@ internal struct Registrar{
 ///here is the single instance of Registrar that should be created.
 ///
 
-internal var registry:Registrar? = nil
+
 
 internal let statefulProcessDispatchQueue = DispatchQueue(label: "statefulDispatchQueue",qos: .default)
 

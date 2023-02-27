@@ -4,11 +4,10 @@
 ## Why SwErl?
 Parallel and concurrent computing should not be hard! SwErl is a small package that reduces not only the difficulty of thinking about concurrency, but also how much code you have to write.
 
-Async-await and promises are both attempts at linearizing asynchronous code. Both approaches still require understanding what is happening outside of the current thread. SwErl takes a different approach. It is designed embrace multi-core machines rather than hide those cores.
+Async-await and promises are both attempts at linearizing asynchronous code. As long as everything goes well, both of these approaches can make concurrent and parallel code seem easier to write and read. They do this by localizing code placement. But when something goes wrong, both still require deep and significant understanding of what is happening outside of the current thread. This includes not just semiphores and locks, but also race conditions and crosslocks. SwErl takes a different approach. It is designed embrace multi-core machines rather than hide those cores. It also negates the need for semiphores and locks, by negating the possibility of race conditions. With no semiphores or locks, crosslocks become a thing of the past.These pain-points of parallel and concurrent programming are now gone from your code, your worries, and your product.
 
-SwErl is based on a spawn-send pattern. You spawn a closure. Then somewhere else in your code you send the spawned closure messages. Each time a closure recieves a message, it is assigned to be processed by a DispatchQueue. When the process finishes, the closure stops using any threads or threading resources. This keeps threads from being blocked while waiting for responses to requests.
+SwErl uses a spawn-send pattern. You spawn long-lived closures. Then elsewhere in your code you send these spawned closures messages. Each time a closure recieves a message, it is assigned to be processed by a DispatchQueue. When the process finishes, the closure stops using any threads or threading resources. By using long-lived closures, SwErl reduces the amount of computation time spent creating and destroying the many short-lived closures in applications that highly leverage the current hardware designs of devices.
 
-The spawn-send pattern also frees you from worrying about shared states between threads. That way you never have to worry about race conditions. Ever! Being freed from race conditions means you don't ever have to create semiphores or locks. Being freed from these means your code can never experience a cross-lock. These pain-points of parallel and concurrent programming are now gone! 
 
 ## Brief Usage Introduction
 Here is a simple example. It uses the main DispatchQueue. When executed, the closure prints out the SwErl process ID, not thread id, and whatever message is sent. Messages can be any valid Swift type. It could be a tuple, struct instance, class instance, string, Int, or any custom type in your application. It could even be another closure if you wanted. 
@@ -57,7 +56,7 @@ You can specify a dispatch queue of your choice. Be careful when you do so. Appl
 
 
 ### SwErl Processes are Lightweight
-Each SwErl process is only 88 Bytes in size. Work is ongoing to reduce this size even further. Both stateful and stateless SwErl processes can be spawned quickly. On the deverloper's first-generation MacStudio, it took less than 0.0002 milliseconds to spawn individual processes. A test exists in the unit tests that allows you to see the speed with which your device spawns SwErl processes.
+Each SwErl process is only 88 Bytes in size. Work is ongoing to reduce this size even further. Both stateful and stateless SwErl processes can be spawned quickly. On the deverloper's first-generation MacStudio, it took less than 0.0005 milliseconds to spawn individual processes. A test exists in the unit tests that allows you to see the speed with which your device spawns SwErl processes.
 
 
 ## Installation
@@ -65,7 +64,7 @@ Each SwErl process is only 88 Bytes in size. Work is ongoing to reduce this size
 ### Swift Package Manager
 
 ```swift
-.package(url: "https://github.com/yenrab/SwErl.git",  from: "0.9.5"),
+.package(url: "https://github.com/yenrab/SwErl.git",  from: "0.9.6"),
 
 ```
 
