@@ -64,7 +64,7 @@ Each SwErl process is only 88 Bytes in size. Work is ongoing to reduce this size
 ### Swift Package Manager
 
 ```swift
-.package(url: "https://github.com/yenrab/SwErl.git",  from: "0.9.6"),
+.package(url: "https://github.com/yenrab/SwErl.git",  from: "0.9.8"),
 
 ```
 
