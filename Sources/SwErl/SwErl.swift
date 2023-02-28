@@ -37,7 +37,7 @@ public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),initialState
 //lambda will be passed an empty tuple as the state to use.
 infix operator ! : ComparisonPrecedence
 extension UUID{
-    static func !( lhs: UUID, rhs: Any) {
+    public static func !( lhs: UUID, rhs: Any) {
         if var process = Registrar.getProcess(forID: lhs){
             if let statefulClosure = process.statefulLambda{
                 do{
@@ -65,7 +65,7 @@ extension UUID{
 
 
 
-internal struct SwErlProcess{
+struct SwErlProcess{
     var queue: DispatchQueue
     
     ///
@@ -100,7 +100,7 @@ internal struct SwErlProcess{
     }
 }
 
-internal struct Registrar{
+struct Registrar{
     static var instance:Registrar = Registrar()
     var registeredProcesses:[UUID:SwErlProcess] = [:]
     static func register(_ toBeAdded:SwErlProcess, PID:UUID)throws -> UUID{
@@ -128,5 +128,5 @@ internal struct Registrar{
 
 
 
-internal let statefulProcessDispatchQueue = DispatchQueue(label: "statefulDispatchQueue",qos: .default)
+public let statefulProcessDispatchQueue = DispatchQueue(label: "statefulDispatchQueue",qos: .default)
 
