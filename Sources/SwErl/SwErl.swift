@@ -10,12 +10,12 @@ import Foundation
 
 
 /// <#Description#>
-enum SwErlError: Error {
+public enum SwErlError: Error {
     case processAlreadyRegistered//there is a process currently registered with that name
 }
 
 
-func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),function:@escaping @Sendable(UUID,Any)->Void)throws -> UUID {
+public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),function:@escaping @Sendable(UUID,Any)->Void)throws -> UUID {
     
     var PID = UUID()
     PID = try Registrar.register(SwErlProcess(registrationID: PID, functionality: function),PID: PID)
@@ -26,7 +26,7 @@ func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),function:@escaping 
 //The state can be any valid Swift type, a tuple, a list, a dictionary, etc.
 ///
 ///The function or lambda passed will be run on a DispatchQueue. The default value is the global dispactch queue with a quality of service of .default.
-func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),initialState:Any,function:@escaping @Sendable(UUID,Any,Any)-> Any)throws -> UUID {
+public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),initialState:Any,function:@escaping @Sendable(UUID,Any,Any)-> Any)throws -> UUID {
     var PID = UUID()
     PID = try Registrar.register(SwErlProcess(registeredPid: PID, initialState: initialState, functionality: function), PID: PID)
     return PID

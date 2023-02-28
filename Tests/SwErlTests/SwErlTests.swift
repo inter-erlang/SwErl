@@ -34,10 +34,11 @@ final class SwErlTests: XCTestCase {
             return (true,5)
         }
         XCTAssertNotNil(Pid)
+        XCTAssertEqual(1,Registrar.instance.registeredProcesses.count)
         
     }
     
-    func testSendMessage() throws {
+    func testSendMessageToStatelessProcess() throws {
         let anID = UUID()
         
         let stateless = try SwErlProcess(registrationID: anID){(name, message) in
@@ -55,6 +56,7 @@ final class SwErlTests: XCTestCase {
         XCTAssertNoThrow(stopperID ! "hello")
         
         XCTAssertNotNil(Registrar.instance.registeredProcesses[stopperID])
+        XCTAssertEqual(2, Registrar.instance.registeredProcesses.count)
     }
     
     func testStatelessSwerlProcessWithDefaults() throws {
@@ -141,6 +143,7 @@ final class SwErlTests: XCTestCase {
         XCTAssertNotNil(Registrar.instance.registeredProcesses[first])
         XCTAssertNotNil(Registrar.instance.registeredProcesses[second])
         XCTAssertNotNil(Registrar.instance.registeredProcesses[third])
+        XCTAssertEqual(3, Registrar.instance.registeredProcesses.count)
         
         
         XCTAssertThrowsError(try Registrar.register(thirdProc, PID: third))
@@ -180,7 +183,7 @@ final class SwErlTests: XCTestCase {
     @available(macOS 13.0, *)
     func testSizeAndSpeed() throws{
         
-        print("\n\n\n!!!!!!!!!!!!!!!!!!! size of SwErlProcess: \(MemoryLayout<SwErlProcess>.size ) bytes")
+        print("\n\n\n!!!!!!!!!!!!!!!!!!! \nsize of SwErlProcess: \(MemoryLayout<SwErlProcess>.size ) bytes")
         
         let stateless = {@Sendable(procName:UUID, message:Any) in
             return
@@ -202,7 +205,24 @@ final class SwErlTests: XCTestCase {
                 _ = try spawn(initialState: 7, function: stateful)
             }
         }
-        print("stateful spawning took \(time.components.attoseconds/count) attoseconds per instantiation\n\n\n")
+        print("stateful spawning took \(time.components.attoseconds/count) attoseconds per instantiation\n!!!!!!!!!!!!!!!!!!!\n\n\n")
+        Registrar.instance.registeredProcesses = [:]//clear the million registered processes
+        print("!!!!!!!!!!!!!!!!!!! \n Sending \(count) messages to stateful process")
+        var Pid = try spawn(initialState: 7, function: stateful)
+        time = timer.measure{
+            for _ in 0..<count{
+                Pid ! 3
+            }
+        }
+        print(" Stateful message passing took \(time.components.attoseconds/count) attoseconds per message sent\n!!!!!!!!!!!!!!!!!!!\n\n\n")
         
+        print("!!!!!!!!!!!!!!!!!!! \n Sending \(count) messages to stateless process")
+        Pid = try spawn(function: stateless)
+        time = timer.measure{
+            for _ in 0..<count{
+                Pid ! 3
+            }
+        }
+        print(" Stateless message passing took \(time.components.attoseconds/count) attoseconds per message sent\n!!!!!!!!!!!!!!!!!!!\n\n\n")
     }
 }

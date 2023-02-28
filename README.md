@@ -56,7 +56,7 @@ You can specify a dispatch queue of your choice. Be careful when you do so. Appl
 
 
 ### SwErl Processes are Lightweight
-Each SwErl process is only 88 Bytes in size. Work is ongoing to reduce this size even further. Both stateful and stateless SwErl processes can be spawned quickly. On the deverloper's first-generation MacStudio, it took less than 0.0005 milliseconds to spawn individual processes. A test exists in the unit tests that allows you to see the speed with which your device spawns SwErl processes.
+Each SwErl process is only 88 Bytes in size. Work is ongoing to reduce this size even further. Both stateful and stateless SwErl processes can be spawned quickly. On the deverloper's first-generation MacStudio, it took less than 0.0005 milliseconds to spawn individual processes and less than 0.00083 milliseconds per message sent. A test exists in the unit tests that allows you to see the speed of SwErl on your devices.
 
 
 ## Installation
