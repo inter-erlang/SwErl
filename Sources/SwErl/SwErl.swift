@@ -38,31 +38,31 @@ public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),initialState
 infix operator ! : ComparisonPrecedence
 extension UUID{
     public static func !( lhs: UUID, rhs: Any) {
-        if var process = Registrar.getProcess(forID: lhs){
-            if let statefulClosure = process.statefulLambda{
-                do{
-                    process.state = try process.queue.sync(execute:{()throws->Any in
-                        return statefulClosure(lhs,process.state!,rhs)
-                    })
-                    Registrar.instance.registeredProcesses[lhs] = process
-                }
-                catch{
-                    print("PID \(process.registeredPid) threw an error. SwErl processes are to deal with any throws that happen within themselves.")
-                }
-            
+        guard var process = Registrar.getProcess(forID: lhs) else{
+            return
+        }
+        if let statefulClosure = process.statefulLambda{
+            do{
+                process.state = try process.queue.sync(execute:{()throws->Any in
+                    return statefulClosure(lhs,process.state!,rhs)
+                })
+                Registrar.instance.registeredProcesses[lhs] = process
             }
-            else{
-                if let statelessClosure = process.statelessLambda{
-                    process.queue.async {
-                        statelessClosure(process.registeredPid,rhs)
-                        
-                    }
+            catch{
+                print("PID \(process.registeredPid) threw an error. SwErl processes are to deal with any throws that happen within themselves.")
+            }
+        
+        }
+        else{
+            if let statelessClosure = process.statelessLambda{
+                process.queue.async {
+                    statelessClosure(process.registeredPid,rhs)
+                    
                 }
             }
         }
     }
 }
-
 
 
 struct SwErlProcess{

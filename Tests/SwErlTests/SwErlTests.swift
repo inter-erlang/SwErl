@@ -38,6 +38,58 @@ final class SwErlTests: XCTestCase {
         
     }
     
+    func testNonPid() throws{
+        XCTAssertNoThrow(UUID() ! "hello")
+    }
+    func testChainingByCapture() throws{
+        //don't let the test end until the last process
+        //executes
+        let expectation = XCTestExpectation(description: "second completed.")
+        let secondPid = try spawn{(PID, message) in
+            print("goodbye \(message)")
+            expectation.fulfill()
+            return
+        }
+        //capture the next pid
+        let initialPid = try spawn{(PID, message) in
+            print("hello \(message)")
+            secondPid ! message
+            return
+        }
+        XCTAssertEqual(2, Registrar.instance.registeredProcesses.count)
+        
+        initialPid ! "Sue"
+        wait(for: [expectation], timeout: 10.0)
+    }
+    
+    func testRawChainingByList() throws {
+        
+        let expectation = XCTestExpectation(description: "all completed.")
+        
+        let initialPid = try spawn{(PID, message) in
+            var (chain,data) = message as! ([UUID], Int)
+            XCTAssertEqual(data, 2)
+            chain.removeFirst() ! (chain,data + 3)
+            return
+        }
+        let secondPid = try spawn{(PID, message) in
+            var (chain,data) = message as! ([UUID], Int)
+            XCTAssertEqual(data, 5)
+            chain.removeFirst() ! (chain,data * 5)
+            return
+        }
+        let finalPid = try spawn{(PID, message) in
+            let (_,data) = message as! ([UUID], Int)
+            XCTAssertEqual(data, 25)
+            expectation.fulfill()
+            return
+        }
+        let chain = [secondPid,finalPid]
+        
+        initialPid ! (chain,2)
+        wait(for: [expectation], timeout: 10.0)
+    }
+    
     func testSendMessageToStatelessProcess() throws {
         let anID = UUID()
         
