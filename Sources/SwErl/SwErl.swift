@@ -15,20 +15,28 @@ public enum SwErlError: Error {
 }
 
 
-public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),function:@escaping @Sendable(UUID,Any)->Void)throws -> UUID {
+
+public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),name:String?=nil,function:@escaping @Sendable(UUID,Any)->Void)throws -> UUID {
     
-    var PID = UUID()
-    PID = try Registrar.register(SwErlProcess(registrationID: PID, functionality: function),PID: PID)
-    Registrar.instance = Registrar.instance//update the global Registrar.instance
+    let PID = UUID()
+    guard let name = name else{
+        try Registrar.register(SwErlProcess(registrationID: PID, functionality: function), PID: PID)
+        return PID
+    }
+    try Registrar.register(SwErlProcess(registrationID: PID, functionality: function), name: name, PID: PID)
     return PID
 }
 //spawn a process with an initial state.
 //The state can be any valid Swift type, a tuple, a list, a dictionary, etc.
 ///
 ///The function or lambda passed will be run on a DispatchQueue. The default value is the global dispactch queue with a quality of service of .default.
-public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),initialState:Any,function:@escaping @Sendable(UUID,Any,Any)-> Any)throws -> UUID {
-    var PID = UUID()
-    PID = try Registrar.register(SwErlProcess(registeredPid: PID, initialState: initialState, functionality: function), PID: PID)
+public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),name:String?=nil,initialState:Any,function:@escaping @Sendable(UUID,Any,Any)-> Any)throws -> UUID {
+    let PID = UUID()
+    guard let name = name else{
+        try Registrar.register(SwErlProcess(registrationID: PID, initialState: initialState, functionality: function), PID: PID)
+        return PID
+    }
+    try Registrar.register(SwErlProcess(registrationID: PID, initialState: initialState, functionality: function), name: name, PID: PID)
     return PID
 }
 
@@ -46,7 +54,7 @@ extension UUID{
                 process.state = try process.queue.sync(execute:{()throws->Any in
                     return statefulClosure(lhs,process.state!,rhs)
                 })
-                Registrar.instance.registeredProcesses[lhs] = process
+                Registrar.instance.processesRegisteredByPid[lhs] = process
             }
             catch{
                 print("PID \(process.registeredPid) threw an error. SwErl processes are to deal with any throws that happen within themselves.")
@@ -61,6 +69,16 @@ extension UUID{
                 }
             }
         }
+    }
+}
+
+//this is a facade function that uses the pid-based function
+extension String{
+    public static func !( lhs: String, rhs: Any) {
+        guard let pid = Registrar.getPid(forName: lhs) else{
+            return
+        }
+        pid ! rhs
     }
 }
 
@@ -80,13 +98,13 @@ struct SwErlProcess{
     let registeredPid:UUID
     
     init(queueToUse:DispatchQueue = statefulProcessDispatchQueue,
-         registeredPid:UUID,
+         registrationID:UUID,
          initialState:Any,
          functionality: @escaping @Sendable (UUID,Any,Any) -> Any) throws {//the returned value is used as the next state.
         self.queue = queueToUse
         self.statefulLambda = functionality
         self.state = initialState
-        self.registeredPid = registeredPid
+        self.registeredPid = registrationID
         
     }
     
@@ -102,23 +120,41 @@ struct SwErlProcess{
 
 struct Registrar{
     static var instance:Registrar = Registrar()
-    var registeredProcesses:[UUID:SwErlProcess] = [:]
-    static func register(_ toBeAdded:SwErlProcess, PID:UUID)throws -> UUID{
+    var processesRegisteredByPid:[UUID:SwErlProcess] = [:]
+    var processesRegisteredByName:[String:UUID] = [:]
+    static func register(_ toBeAdded:SwErlProcess, PID:UUID)throws{
         guard Registrar.getProcess(forID: PID) == nil else{
             throw SwErlError.processAlreadyRegistered
         }
-        instance.registeredProcesses.updateValue(toBeAdded, forKey: PID)
-        return PID
+        instance.processesRegisteredByPid.updateValue(toBeAdded, forKey: PID)
+    }
+    static func register(_ toBeAdded:SwErlProcess, name:String, PID:UUID)throws{
+        guard Registrar.getProcess(forID: name) == nil else{
+            throw SwErlError.processAlreadyRegistered
+        }
+        instance.processesRegisteredByPid.updateValue(toBeAdded, forKey: PID)
+        instance.processesRegisteredByName.updateValue(PID, forKey: name)
     }
     
     static func remove(_ registrationID:UUID){
-        instance.registeredProcesses.removeValue(forKey: registrationID)
+        instance.processesRegisteredByPid.removeValue(forKey: registrationID)
     }
     static func getProcess(forID:UUID)->SwErlProcess?{
-        return instance.registeredProcesses[forID]
+        return instance.processesRegisteredByPid[forID]
+    }
+    static func getProcess(forID:String)->SwErlProcess?{
+        guard let pid =  instance.processesRegisteredByName[forID] else { return nil
+        }
+        return instance.processesRegisteredByPid[pid]
+    }
+    static func getPid(forName:String)->UUID?{
+        return instance.processesRegisteredByName[forName]
     }
     static func getAllPIDs()->Dictionary<UUID, SwErlProcess>.Keys{
-        return instance.registeredProcesses.keys
+        return instance.processesRegisteredByPid.keys
+    }
+    static func getAllNames()->Dictionary<String, UUID>.Keys{
+        return instance.processesRegisteredByName.keys
     }
 }
 

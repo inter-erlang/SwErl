@@ -7,14 +7,14 @@ final class SwErlTests: XCTestCase {
         // This is the setUp() instance method.
         // XCTest calls it before each test method.
         // Set up any synchronous per-test state here.
-        Registrar.instance.registeredProcesses = [:]
+        Registrar.instance.processesRegisteredByPid = [:]
      }
     
     override func tearDown() {
         // This is the tearDown() instance method.
         // XCTest calls it after each test method.
         // Perform any synchronous per-test cleanup here.
-        Registrar.instance.registeredProcesses = [:]
+        Registrar.instance.processesRegisteredByPid = [:]
      }
     
     
@@ -23,22 +23,47 @@ final class SwErlTests: XCTestCase {
             print("hello \(message)")
             return
         }
-        print("\(Registrar.instance.registeredProcesses.count)")
-        XCTAssertNotNil(Pid)
-        XCTAssertEqual(1,Registrar.instance.registeredProcesses.count)
+        XCTAssertEqual(1,Registrar.instance.processesRegisteredByPid.count)
     }
     
     
     func testHappyPathSpawnStateful() throws {
-        let Pid = try? spawn(initialState: 3){(procName, message,state) in
+        let Pid = try spawn(initialState: 3){(procName, message,state) in
             return (true,5)
         }
-        XCTAssertNotNil(Pid)
-        XCTAssertEqual(1,Registrar.instance.registeredProcesses.count)
+        XCTAssertEqual(1,Registrar.instance.processesRegisteredByPid.count)
         
     }
+    func testHappyPathSpawnWithName() throws {
+        let Pid = try spawn(name:"silly"){(PID, message) in
+            print("hello \(message)")
+            return
+        }
+        XCTAssertEqual(1,Registrar.instance.processesRegisteredByName.count)
+    }
     
-    func testNonPid() throws{
+    
+    func testSendMessageUsingName() throws {
+        let expectation = XCTestExpectation(description: "send completed.")
+        let _ = try spawn(name:"silly"){(PID, message) in
+            expectation.fulfill()
+            return
+        }
+        "silly" ! 5
+        wait(for: [expectation], timeout: 10.0)
+    }
+    
+    func testSendMessageUsingPid() throws {
+        let expectation = XCTestExpectation(description: "send completed.")
+        let Pid = try spawn(name:"silly"){(PID, message) in
+            expectation.fulfill()
+            return
+        }
+        Pid ! 5
+        wait(for: [expectation], timeout: 10.0)
+    }
+    
+    func testNotRegisteredPid() throws{
         XCTAssertNoThrow(UUID() ! "hello")
     }
     func testChainingByCapture() throws{
@@ -56,7 +81,7 @@ final class SwErlTests: XCTestCase {
             secondPid ! message
             return
         }
-        XCTAssertEqual(2, Registrar.instance.registeredProcesses.count)
+        XCTAssertEqual(2, Registrar.instance.processesRegisteredByPid.count)
         
         initialPid ! "Sue"
         wait(for: [expectation], timeout: 10.0)
@@ -98,7 +123,7 @@ final class SwErlTests: XCTestCase {
         }
         XCTAssertNoThrow(try Registrar.register(stateless, PID: anID))
         XCTAssertNoThrow(anID ! "hello")
-        XCTAssertNotNil(Registrar.instance.registeredProcesses[anID])
+        XCTAssertNotNil(Registrar.instance.processesRegisteredByPid[anID])
         
         let stopperID = UUID()
         let stopper = try SwErlProcess(registrationID: stopperID){(name, message) in
@@ -107,8 +132,8 @@ final class SwErlTests: XCTestCase {
         XCTAssertNoThrow(try Registrar.register(stopper, PID: stopperID))
         XCTAssertNoThrow(stopperID ! "hello")
         
-        XCTAssertNotNil(Registrar.instance.registeredProcesses[stopperID])
-        XCTAssertEqual(2, Registrar.instance.registeredProcesses.count)
+        XCTAssertNotNil(Registrar.instance.processesRegisteredByPid[stopperID])
+        XCTAssertEqual(2, Registrar.instance.processesRegisteredByPid.count)
     }
     
     func testStatelessSwerlProcessWithDefaults() throws {
@@ -139,7 +164,7 @@ final class SwErlTests: XCTestCase {
     
     func testStatefulSwerlProcessWithDefaults() throws {
         let hasState = UUID()
-        let stateful:SwErlProcess = try! SwErlProcess(registeredPid: hasState,initialState: ["eggs","flour"]){(procName, message ,state) in
+        let stateful:SwErlProcess = try! SwErlProcess(registrationID: hasState,initialState: ["eggs","flour"]){(procName, message ,state) in
             var updatedState:[String] = state as![String]
             updatedState.append(message as! String)
             return (true,updatedState)
@@ -155,7 +180,7 @@ final class SwErlTests: XCTestCase {
     
     func testStatefulSwerlProcessNoDefaults() throws {
         let hasState = UUID()
-        let stateful:SwErlProcess = try! SwErlProcess(queueToUse:DispatchQueue.main,registeredPid: hasState,initialState: ["eggs","flour"]){(procName, message ,state) in
+        let stateful:SwErlProcess = try! SwErlProcess(queueToUse:DispatchQueue.main,registrationID: hasState,initialState: ["eggs","flour"]){(procName, message ,state) in
                 var updatedState:[String] = state as![String]
                 updatedState.append(message as! String)
                 return (true,updatedState)
@@ -173,7 +198,7 @@ final class SwErlTests: XCTestCase {
         let first = UUID()
         let second = UUID()
         let third = UUID()
-        XCTAssertEqual(Registrar.instance.registeredProcesses.count, 0)
+        XCTAssertEqual(Registrar.instance.processesRegisteredByPid.count, 0)
         let firstProc = try SwErlProcess(registrationID: first){(procName, message) in
             return
         }
@@ -183,19 +208,19 @@ final class SwErlTests: XCTestCase {
         let thirdProc = try SwErlProcess(registrationID: third){(procName, message) in
             return
         }
-        XCTAssertNil(Registrar.instance.registeredProcesses[first])
-        XCTAssertNil(Registrar.instance.registeredProcesses[second])
-        XCTAssertNil(Registrar.instance.registeredProcesses[third])
+        XCTAssertNil(Registrar.instance.processesRegisteredByPid[first])
+        XCTAssertNil(Registrar.instance.processesRegisteredByPid[second])
+        XCTAssertNil(Registrar.instance.processesRegisteredByPid[third])
         
         XCTAssertNoThrow(try Registrar.register(firstProc, PID: first))
         XCTAssertNoThrow(try Registrar.register(secondProc, PID: second))
         XCTAssertNoThrow(try Registrar.register(thirdProc, PID: third))
         
         
-        XCTAssertNotNil(Registrar.instance.registeredProcesses[first])
-        XCTAssertNotNil(Registrar.instance.registeredProcesses[second])
-        XCTAssertNotNil(Registrar.instance.registeredProcesses[third])
-        XCTAssertEqual(3, Registrar.instance.registeredProcesses.count)
+        XCTAssertNotNil(Registrar.instance.processesRegisteredByPid[first])
+        XCTAssertNotNil(Registrar.instance.processesRegisteredByPid[second])
+        XCTAssertNotNil(Registrar.instance.processesRegisteredByPid[third])
+        XCTAssertEqual(3, Registrar.instance.processesRegisteredByPid.count)
         
         
         XCTAssertThrowsError(try Registrar.register(thirdProc, PID: third))
@@ -258,7 +283,7 @@ final class SwErlTests: XCTestCase {
             }
         }
         print("stateful spawning took \(time.components.attoseconds/count) attoseconds per instantiation\n!!!!!!!!!!!!!!!!!!!\n\n\n")
-        Registrar.instance.registeredProcesses = [:]//clear the million registered processes
+        Registrar.instance.processesRegisteredByPid = [:]//clear the million registered processes
         print("!!!!!!!!!!!!!!!!!!! \n Sending \(count) messages to stateful process")
         var Pid = try spawn(initialState: 7, function: stateful)
         time = timer.measure{
