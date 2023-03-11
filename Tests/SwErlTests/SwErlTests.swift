@@ -55,7 +55,7 @@ final class SwErlTests: XCTestCase {
     
     func testSendMessageUsingPid() throws {
         let expectation = XCTestExpectation(description: "send completed.")
-        let Pid = try spawn(name:"silly"){(PID, message) in
+        let Pid = try spawn{(PID, message) in
             expectation.fulfill()
             return
         }
@@ -301,5 +301,18 @@ final class SwErlTests: XCTestCase {
             }
         }
         print(" Stateless message passing took \(time.components.attoseconds/count) attoseconds per message sent\n!!!!!!!!!!!!!!!!!!!\n\n\n")
+        time = timer.measure{
+            for _ in 0..<count{
+                Task {
+                    await duplicateStatelessProcessBehavior(message:"hello")
+                }
+            }
+        }
+        print("Async/await in Tasks took \(time.components.attoseconds/count) attoseconds per task started\n!!!!!!!!!!!!!!!!!!!\n\n\n")
+        
+    }
+    
+    func duplicateStatelessProcessBehavior(message:String) async{
+        return
     }
 }
