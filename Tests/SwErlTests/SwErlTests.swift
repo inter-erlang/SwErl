@@ -309,10 +309,22 @@ final class SwErlTests: XCTestCase {
             }
         }
         print("Async/await in Tasks took \(time.components.attoseconds/count) attoseconds per task started\n!!!!!!!!!!!!!!!!!!!\n\n\n")
+        time = timer.measure{
+            for _ in 0..<count{
+                DispatchQueue.global().async {
+                    self.doNothing()
+                    
+                }
+            }
+        }
+        print("Using dispatch queue only took \(time.components.attoseconds/count) attoseconds per call started\n!!!!!!!!!!!!!!!!!!!\n\n\n")
         
     }
     
     func duplicateStatelessProcessBehavior(message:String) async{
+        return
+    }
+    func doNothing(){
         return
     }
 }
