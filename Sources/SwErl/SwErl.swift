@@ -14,11 +14,37 @@ public enum SwErlError: Error {
     case processAlreadyRegistered//there is a process currently registered with that name
 }
 
+struct ProcessIDCounter {
+    private var queue = DispatchQueue(label: "process.counter")
+    var value: UInt32 = 0
+    var creation: UInt32 = 0
+
+    mutating func next()->(UInt32,UInt32) {
+        queue.sync {
+            value = value + 1
+            if value == UInt32.max{
+                value = 0
+                creation = creation + 1
+            }
+        }
+        return (value,creation)
+    }
+}
+
+var pidCounter = ProcessIDCounter()
+
+public struct Pid:Hashable,Equatable {
+    let id:UInt32
+    let serial:UInt32
+    let creation:UInt32
+}
+//typealias Pid = (id:UInt32,serial:UInt32,creation:UInt32)
 
 
-public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),name:String?=nil,function:@escaping @Sendable(UUID,Any)->Void)throws -> UUID {
-    
-    let PID = UUID()
+
+public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),name:String?=nil,function:@escaping @Sendable(Pid,Any)->Void)throws -> Pid {
+    let (aSerial,aCreation) = pidCounter.next()
+    let PID = Pid(id: 0,serial: aSerial,creation: aCreation)
     guard let name = name else{
         try Registrar.register(SwErlProcess(registrationID: PID, functionality: function), PID: PID)
         return PID
@@ -30,8 +56,9 @@ public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),name:String?
 //The state can be any valid Swift type, a tuple, a list, a dictionary, etc.
 ///
 ///The function or lambda passed will be run on a DispatchQueue. The default value is the global dispactch queue with a quality of service of .default.
-public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),name:String?=nil,initialState:Any,function:@escaping @Sendable(UUID,Any,Any)-> Any)throws -> UUID {
-    let PID = UUID()
+public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),name:String?=nil,initialState:Any,function:@escaping @Sendable(Pid,Any,Any)-> Any)throws -> Pid {
+    let (aSerial,aCreation) = pidCounter.next()
+    let PID = Pid(id: 0, serial: aSerial, creation: aCreation)
     guard let name = name else{
         try Registrar.register(SwErlProcess(registrationID: PID, initialState: initialState, functionality: function), PID: PID)
         return PID
@@ -44,8 +71,8 @@ public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),name:String?
 //If a stateful process has nil as it's state, the stateful
 //lambda will be passed an empty tuple as the state to use.
 infix operator ! : ComparisonPrecedence
-extension UUID{
-    public static func !( lhs: UUID, rhs: Any) {
+extension Pid{
+    public static func !( lhs: Pid, rhs: Any) {
         guard var process = Registrar.getProcess(forID: lhs) else{
             return
         }
@@ -89,18 +116,18 @@ struct SwErlProcess{
     ///
     ///this lambda has three parameters, self(the process' registered name), state and message.
     ///
-    var statefulLambda:((UUID, Any,Any)->Any)? = nil
+    var statefulLambda:((Pid, Any,Any)->Any)? = nil
     ///
     ///this lambda has two parameters. The first is the registered
     ///name, self, and the second is the message
-    var statelessLambda:((UUID, Any)->Void)? = nil
+    var statelessLambda:((Pid, Any)->Void)? = nil
     var state:Any?
-    let registeredPid:UUID
+    let registeredPid:Pid
     
     init(queueToUse:DispatchQueue = statefulProcessDispatchQueue,
-         registrationID:UUID,
+         registrationID:Pid,
          initialState:Any,
-         functionality: @escaping @Sendable (UUID,Any,Any) -> Any) throws {//the returned value is used as the next state.
+         functionality: @escaping @Sendable (Pid,Any,Any) -> Any) throws {//the returned value is used as the next state.
         self.queue = queueToUse
         self.statefulLambda = functionality
         self.state = initialState
@@ -109,8 +136,8 @@ struct SwErlProcess{
     }
     
     init(queueToUse:DispatchQueue = DispatchQueue.global(),
-         registrationID:UUID,
-         functionality: @escaping @Sendable (UUID,Any) -> Void ) throws{
+         registrationID:Pid,
+         functionality: @escaping @Sendable (Pid,Any) -> Void ) throws{
         self.queue = queueToUse
         self.statelessLambda = functionality
         self.state = nil
@@ -120,15 +147,15 @@ struct SwErlProcess{
 
 struct Registrar{
     static var instance:Registrar = Registrar()
-    var processesRegisteredByPid:[UUID:SwErlProcess] = [:]
-    var processesRegisteredByName:[String:UUID] = [:]
-    static func register(_ toBeAdded:SwErlProcess, PID:UUID)throws{
+    var processesRegisteredByPid:[Pid:SwErlProcess] = [:]
+    var processesRegisteredByName:[String:Pid] = [:]
+    static func register(_ toBeAdded:SwErlProcess, PID:Pid)throws{
         guard Registrar.getProcess(forID: PID) == nil else{
             throw SwErlError.processAlreadyRegistered
         }
         instance.processesRegisteredByPid.updateValue(toBeAdded, forKey: PID)
     }
-    static func register(_ toBeAdded:SwErlProcess, name:String, PID:UUID)throws{
+    static func register(_ toBeAdded:SwErlProcess, name:String, PID:Pid)throws{
         guard Registrar.getProcess(forID: name) == nil else{
             throw SwErlError.processAlreadyRegistered
         }
@@ -136,10 +163,10 @@ struct Registrar{
         instance.processesRegisteredByName.updateValue(PID, forKey: name)
     }
     
-    static func remove(_ registrationID:UUID){
+    static func remove(_ registrationID:Pid){
         instance.processesRegisteredByPid.removeValue(forKey: registrationID)
     }
-    static func getProcess(forID:UUID)->SwErlProcess?{
+    static func getProcess(forID:Pid)->SwErlProcess?{
         return instance.processesRegisteredByPid[forID]
     }
     static func getProcess(forID:String)->SwErlProcess?{
@@ -147,13 +174,13 @@ struct Registrar{
         }
         return instance.processesRegisteredByPid[pid]
     }
-    static func getPid(forName:String)->UUID?{
+    static func getPid(forName:String)->Pid?{
         return instance.processesRegisteredByName[forName]
     }
-    static func getAllPIDs()->Dictionary<UUID, SwErlProcess>.Keys{
+    static func getAllPIDs()->Dictionary<Pid, SwErlProcess>.Keys{
         return instance.processesRegisteredByPid.keys
     }
-    static func getAllNames()->Dictionary<String, UUID>.Keys{
+    static func getAllNames()->Dictionary<String, Pid>.Keys{
         return instance.processesRegisteredByName.keys
     }
 }
