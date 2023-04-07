@@ -6,7 +6,9 @@ Parallel and concurrent computing should not be hard! SwErl is a small package t
 
 Async-await and promises are both attempts at linearizing asynchronous code. As long as everything goes well, both of these approaches can make concurrent and parallel code seem easier to write and read. They do this by localizing code placement. But when something goes wrong, both still require deep and significant understanding of what is happening outside of the current thread. This includes not just semiphores and locks, but also race conditions and crosslocks. SwErl takes a different approach. It is designed embrace multi-core machines rather than hide those cores. It also negates the need for semiphores and locks, by negating the possibility of race conditions. With no semiphores or locks, crosslocks become a thing of the past.These pain-points of parallel and concurrent programming are now gone from your code, your worries, and your product.
 
-SwErl uses a spawn-send pattern. You spawn long-lived closures. Then elsewhere in your code you send these spawned closures messages. Each time a closure recieves a message, it is assigned to be processed by a DispatchQueue. When the process finishes, the closure stops using any threads or threading resources. By using long-lived closures, SwErl reduces the amount of computation time spent creating and destroying the many short-lived closures in applications that highly leverage the current hardware designs of devices.
+SwErl uses a spawn-send pattern. You spawn long-lived closures. Then elsewhere in your code you send messages to these spawned closures. Each time a closure recieves a message, it is assigned to be processed by a DispatchQueue. When the process finishes, the closure stops using any threads or threading resources. By using long-lived closures, SwErl reduces the amount of computation time spent creating and destroying the many short-lived closures in applications that highly leverage the current hardware designs of devices.
+
+SwErl also allows you to have closures spawn and terminate other closures. Such short-lived closures should be used sparingly since they use the same amout of computational effort to create and destroy as do long-lived closures.
 
 
 ## Brief Usage Introduction
@@ -69,3 +71,8 @@ Each SwErl process is only 88 Bytes in size. Work is ongoing to reduce this size
 ```
 
 Also add `"SwErl"` to the target's dependencies.
+
+
+## Underpinnings
+
+SwErl is an expression of the actor model. While Swift has items called actors, SwErl's' expression is simpler to use and avoids the over-proliferation of Swift's async/await syntax. 
