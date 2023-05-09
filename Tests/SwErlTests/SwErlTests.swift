@@ -59,8 +59,8 @@ final class SwErlTests: XCTestCase {
             return
         }
     
-//        XCTAssertEqual(Registrar.instance.silly.serial, 1)
-//        XCTAssertEqual(Registrar.instance.silly.creation, 0)
+        XCTAssertEqual(Registrar.instance.silly.serial, 1)
+        XCTAssertEqual(Registrar.instance.silly.creation, 0)
         XCTAssertEqual(1, Registrar.instance.processesRegisteredByName.count)
     }
     
@@ -70,7 +70,7 @@ final class SwErlTests: XCTestCase {
             expectation.fulfill()
             return
         }
-//        Registrar.instance.silly ! 5
+        Registrar.instance.silly ! 5
         "silly" ! 5
         wait(for: [expectation], timeout: 10.0)
     }

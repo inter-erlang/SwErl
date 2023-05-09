@@ -158,11 +158,20 @@ struct SwErlProcess {
 }
 
 /// <#Description#>
+@dynamicMemberLookup
 struct Registrar {
     var processesRegisteredByPid: [Pid:SwErlProcess] = [:]
     var processesRegisteredByName: [String:Pid] = [:]
     
     static var instance: Registrar = Registrar()
+    
+    /// Looks up a PID by its name
+    subscript(dynamicMember name: String) -> Pid {
+        guard let pid = processesRegisteredByName[name] else {
+            fatalError("PID by name: \(name) does not exist")
+        }
+        return pid
+    }
     
     /// <#Description#>
     static func register(_ toBeAdded:SwErlProcess, PID: Pid) throws {
