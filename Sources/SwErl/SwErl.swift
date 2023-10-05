@@ -187,7 +187,7 @@ struct Registrar{
     static var instance:Registrar = Registrar()
     var processesRegisteredByPid:[Pid:SwErlProcess] = [:]
     var processesRegisteredByName:[String:Pid] = [:]
-    var OTPActorsRegisteredByPid:[Pid:(any OTPActor_behavior,Any?)] = [:]
+    var OTPActorsRegisteredByPid:[Pid:(OTPActor_behavior.Type,Any?)] = [:]
     var OTPActorsRegisteredByName:[String:Pid] = [:]
     static func register(_ toBeAdded:SwErlProcess, PID:Pid)throws{
         guard Registrar.getProcess(forID: PID) == nil else{
@@ -202,7 +202,7 @@ struct Registrar{
         instance.processesRegisteredByPid.updateValue(toBeAdded, forKey: PID)
         instance.processesRegisteredByName.updateValue(PID, forKey: name)
     }
-    static func register(_ toBeAdded:(any OTPActor_behavior,Any?), name:String)throws->Pid{
+    static func register<T:OTPActor_behavior>(_ toBeAdded:(T.Type,Any?), name:String)throws->Pid{
         let (aSerial,aCreation) = pidCounter.next()
         let PID = Pid(id: 0,serial: aSerial,creation: aCreation)
         guard Registrar.getProcess(forID: name) == nil else{

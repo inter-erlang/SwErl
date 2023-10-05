@@ -27,11 +27,11 @@ import Foundation
 
 //This is the protocol is used to express the behavior of
 public protocol statem_behavior:OTPActor_behavior{
-    func start_link(queueToUse:DispatchQueue, name:String,actor_type:any statem_behavior,initial_state:Any)throws->Void
-    func initialize_state(initial_data:Any)->Any
-    func unlink(reason:String,current_state:Any,data:Any)
+    static func start_link(queueToUse:DispatchQueue, name:String,actor_type:any statem_behavior,initial_state:Any)throws->Void
+    static func initialize_state(initial_data:Any)->Any
+    static func unlink(reason:String,current_state:Any,data:Any)
     //the value of handle_event_cast is the updated state
-    func handle_event_cast(message:Any,current_state:Any)->Any
+    static func handle_event_cast(message:Any,current_state:Any)->Any
 }
 
     
@@ -55,20 +55,20 @@ public protocol statem_behavior:OTPActor_behavior{
   - Version:
     0.1
  */
-public enum gen_statem{
-    public static let start_link:(DispatchQueue,String,any statem_behavior,Any) throws->Pid = {(queueToUse,name,actor_type,initial_data) in
+public enum gen_statem:OTPActor_behavior{
+    static func start_link<T:statem_behavior>(queueToUse:DispatchQueue = DispatchQueue.global(),name:String,actor_type:T.Type,initial_data:Any) throws->Pid{
         let initial_state = actor_type.initialize_state(initial_data: initial_data)
         //register the actor by name. name => (actor_type,initial_data)
         return try Registrar.register((actor_type,initial_state),name: name)
     }
-    public static let  initialize_state:(Any?)->Any? = {initial_data in
+    static func  initialize_state(initial_data:Any?)->Any? {
         initial_data
     }
-    public static let unlink:(String)->Void = { name in
+    static func unlink(name:String){
         Registrar.remove(name)
     }
     //the value of handle_event_cast is the updated state
-    public static let  cast:(String,Any)throws->Void = {(name,message) in
+    static func cast(name:String,message:Any)throws{
         guard let PID = Registrar.instance.OTPActorsRegisteredByName[name] else{
             return
         }
@@ -82,7 +82,7 @@ public enum gen_statem{
         
         //this function only works on enums with the statem behavior.
         //if the type is anything except a statem_behavior, do nothing.
-        guard let statem = type as? statem_behavior else{
+        guard let statem = type as? statem_behavior.Type else{
             throw SwErlError.notStatem_behavior
         }
         //state machines always have a stored state.

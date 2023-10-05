@@ -303,6 +303,58 @@ final class SwErlTests: XCTestCase {
         XCTAssertEqual("5.0,2.0,0.0", Registrar.getProcess(forID: pid)?.state as! String)
     }
     
+    //
+    // gen_statem_tests
+    //
+    func testGenStatemStartLink() throws {
+        //dummy statem_behavior
+        enum Tester_statem:statem_behavior{
+            static func start_link(queueToUse: DispatchQueue, name: String, actor_type: SwErl.statem_behavior, initial_state: Any) throws {
+                
+            }
+            
+            static func initialize_state(initial_data: Any) -> Any {
+                initial_data
+            }
+            
+            static func unlink(reason: String, current_state: Any, data: Any) {
+                
+            }
+            
+            static func handle_event_cast(message: Any, current_state: Any) -> Any {
+                4
+            }
+            
+            
+        }
+        
+        //Happy path
+        let PID = try gen_statem.start_link(name: "some_name", actor_type: Tester_statem.self, initial_data: ("bob",13,(22,45)))
+        XCTAssertEqual(Pid(id: 0,serial: 1,creation: 0),PID)
+        XCTAssertEqual(PID, Registrar.instance.OTPActorsRegisteredByName["some_name"])
+        let (aType,Data) = Registrar.instance.OTPActorsRegisteredByPid[PID]!
+        XCTAssertNoThrow(aType as! Tester_statem.Type)
+        let (name,age,(x,y)) = Data! as! (String, Int, (Int, Int))
+        XCTAssertEqual("bob",name)
+        XCTAssertEqual(13, age)
+        XCTAssertEqual(22, x)
+        XCTAssertEqual(45, y)
+        
+        //nasty thoughts start here
+        
+    }
+    ///
+    ///The default behavior of this function just echos the data parameter passed.
+    ///If you want other behavior, provide an implementation in your enum that uses
+    ///the statem_behavior.
+    func testGenStatemInitializeState() throws {
+        //Happy path
+        XCTAssertEqual(100, gen_statem.initialize_state(initial_data: 100) as! Int)
+        //nasty thoughts start here
+        let unreal_int =  gen_statem.initialize_state(initial_data: nil) as? Int
+        XCTAssertEqual(nil, unreal_int)
+    }
+    
     @available(macOS 13.0, *)
     func testSizeAndSpeed() throws{
         
@@ -373,4 +425,5 @@ final class SwErlTests: XCTestCase {
     func doNothing(){
         return
     }
+
 }
