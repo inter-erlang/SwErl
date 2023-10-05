@@ -33,7 +33,7 @@ import Foundation
 public enum SwErlError: Error {
     case processAlreadyRegistered//there is a process currently registered with that name
     case nameNotRegistered
-    case notOTPProcess
+    case notRegisteredByPid
     case notStatem_behavior
     case statem_behaviorWithoutState
 }
@@ -188,7 +188,7 @@ struct Registrar{
     var processesRegisteredByPid:[Pid:SwErlProcess] = [:]
     var processesRegisteredByName:[String:Pid] = [:]
     var OTPActorsRegisteredByPid:[Pid:(OTPActor_behavior.Type,Any?)] = [:]
-    var OTPActorsRegisteredByName:[String:Pid] = [:]
+    var OTPActorsRegisteredByName:[String:Pid] = [:]//get rid of this it is a duplicate
     static func register(_ toBeAdded:SwErlProcess, PID:Pid)throws{
         guard Registrar.getProcess(forID: PID) == nil else{
             throw SwErlError.processAlreadyRegistered

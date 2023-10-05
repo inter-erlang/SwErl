@@ -26,6 +26,9 @@
 import Foundation
 
 //This is the protocol is used to express the behavior of
+/**
+ This protocol enforces the types of behaviors required of every state machine in SwErl. It extends the OTPActor behavior like all non-process SwErl actors. 
+ */
 public protocol statem_behavior:OTPActor_behavior{
     static func start_link(queueToUse:DispatchQueue, name:String,actor_type:any statem_behavior,initial_state:Any)throws->Void
     static func initialize_state(initial_data:Any)->Any
@@ -33,11 +36,6 @@ public protocol statem_behavior:OTPActor_behavior{
     //the value of handle_event_cast is the updated state
     static func handle_event_cast(message:Any,current_state:Any)->Any
 }
-
-    
-
-//These are the functions that mimic some of the gen_statem
-//Erlang module's functions
 /**
  This enumeration has, as properties, a set of generic functions that conduct
  the communication required of all statem behaviors. These functions ensure
@@ -61,27 +59,22 @@ public enum gen_statem:OTPActor_behavior{
         //register the actor by name. name => (actor_type,initial_data)
         return try Registrar.register((actor_type,initial_state),name: name)
     }
-    static func  initialize_state(initial_data:Any?)->Any? {
-        initial_data
-    }
     static func unlink(name:String){
         Registrar.remove(name)
     }
     //the value of handle_event_cast is the updated state
+    //if there is no pid associated with that name, throw an exception
     static func cast(name:String,message:Any)throws{
         guard let PID = Registrar.instance.OTPActorsRegisteredByName[name] else{
-            return
+            throw SwErlError.nameNotRegistered
         }
-        try gen_statem.pid_cast(PID,message)
-    }
-    public static let pid_cast:(Pid,Any)throws->Void = {(PID,current_message) in
-        //if the pid hasn't been registered correctly, do nothing.
+        //if the pid hasn't been registered correctly, throw an exception.
         guard let (type,stored_state) = Registrar.instance.OTPActorsRegisteredByPid[PID] else{
-            throw SwErlError.notOTPProcess
+            throw SwErlError.notRegisteredByPid
         }
         
         //this function only works on enums with the statem behavior.
-        //if the type is anything except a statem_behavior, do nothing.
+        //if the type is anything except a statem_behavior, throw an exception.
         guard let statem = type as? statem_behavior.Type else{
             throw SwErlError.notStatem_behavior
         }
@@ -90,7 +83,7 @@ public enum gen_statem:OTPActor_behavior{
         guard let state = stored_state else{
             throw SwErlError.statem_behaviorWithoutState
         }
-        let updated_state = statem.handle_event_cast(message: current_message, current_state: state)
+        let updated_state = statem.handle_event_cast(message: message, current_state: state)
         Registrar.instance.OTPActorsRegisteredByPid.updateValue((statem,updated_state), forKey: PID)
     }
 }

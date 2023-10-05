@@ -24,5 +24,9 @@
 //  Created by Lee Barney on 10/3/23.
 //
 
-
-public protocol OTPActor_behavior{} 
+/**
+ This behavior exists as a base protocol for all non-process SwErl actors.
+ Since it is the base, all types of SwErl actors can be accumulated in
+ shared data structures without resorting to using Swift's Any BIT (Built In Type).
+ */
+public protocol OTPActor_behavior{}

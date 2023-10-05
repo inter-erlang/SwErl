@@ -343,16 +343,65 @@ final class SwErlTests: XCTestCase {
         //nasty thoughts start here
         
     }
-    ///
-    ///The default behavior of this function just echos the data parameter passed.
-    ///If you want other behavior, provide an implementation in your enum that uses
-    ///the statem_behavior.
-    func testGenStatemInitializeState() throws {
+    
+    func testGenStatemCast() throws{
+        //dummy statem_behavior
+        enum Tester_statem:statem_behavior{
+            static func start_link(queueToUse: DispatchQueue, name: String, actor_type: SwErl.statem_behavior, initial_state: Any) throws {
+                
+            }
+            
+            static func initialize_state(initial_data: Any) -> Any {
+                initial_data
+            }
+            
+            static func unlink(reason: String, current_state: Any, data: Any) {
+                
+            }
+            
+            static func handle_event_cast(message: Any, current_state: Any) -> Any {
+                XCTAssertEqual("hello", current_state as! String)
+                return "executed"//return the modified state
+            }
+            
+            
+        }
+        enum Not_statem:OTPActor_behavior{}
+        //setup case
+        //happy setup
+        let PID = Pid(id: 0,serial: 1,creation: 0)
+        Registrar.instance.OTPActorsRegisteredByPid[PID] = (Tester_statem.self as statem_behavior.Type,"hello")
+        Registrar.instance.OTPActorsRegisteredByName["some_name"] = PID
+        
+        //nasty setup: no state
+        
+        let PID2 = Pid(id: 0,serial: 2,creation: 0)
+        Registrar.instance.OTPActorsRegisteredByPid[PID2] = (Tester_statem.self as statem_behavior.Type,nil)
+        Registrar.instance.OTPActorsRegisteredByName["stateless"] = PID2
+        
+        //nasty setup: not a statem
+        let PID3 = Pid(id: 0,serial: 3,creation: 0)
+        Registrar.instance.OTPActorsRegisteredByPid[PID3] = (Not_statem.self as Not_statem.Type,"hello")
+        Registrar.instance.OTPActorsRegisteredByName["not_statem"] = PID3
+        
+        
+        //nasty setup: not a statem
+        let PID4 = Pid(id: 0,serial: 4,creation: 0)
+        Registrar.instance.OTPActorsRegisteredByName["no_pid"] = PID4
+        
+        
         //Happy path
-        XCTAssertEqual(100, gen_statem.initialize_state(initial_data: 100) as! Int)
-        //nasty thoughts start here
-        let unreal_int =  gen_statem.initialize_state(initial_data: nil) as? Int
-        XCTAssertEqual(nil, unreal_int)
+        try gen_statem.cast(name: "some_name", message: 50)
+        let (_, current_state) = Registrar.instance.OTPActorsRegisteredByPid[PID]!
+        XCTAssertEqual("executed", current_state as! String)
+        
+        //Nasty thoughts start here
+        
+        XCTAssertThrowsError(try gen_statem.cast(name: "stateless", message: 50))
+        //name not registered
+        XCTAssertThrowsError(try gen_statem.cast(name: "bob", message: 50))
+        XCTAssertThrowsError(try gen_statem.cast(name: "not_statem", message: 50))
+        XCTAssertThrowsError(try gen_statem.cast(name: "no_pid", message: 50))
     }
     
     @available(macOS 13.0, *)
