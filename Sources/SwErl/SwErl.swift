@@ -37,14 +37,28 @@ public enum SwErlError: Error {
     case notStatem_behavior
     case statem_behaviorWithoutState
 }
-
+/**
+ This struct implements a thread-safe counter for asyncronous process id's.
+  - Author:
+    Lee S. Barney
+  - Version:
+    0.1
+ */
 struct ProcessIDCounter {
-    private var queue = DispatchQueue(label: "process.counter")
+    private var counterQueue = DispatchQueue(label: "process.counter")
     var value: UInt32 = 0
     var creation: UInt32 = 0
-
+    /**
+     This function is used to increment the count of the process ID's in a thread-safe manner. It executes syncrounously on a DispatchQueue that only it uses.
+       - Parameters: none
+      - Value: a tuple consisting of 2 unsigned 32 bit itegers. For each of the second values, UInt32.MAX of the first numbers is used. This allows each application using SwErl to have UInt32.MAX \* UInt32.MAX total registered SwErl processes.
+      - Author:
+        Lee S. Barney
+      - Version:
+        0.1
+     */
     mutating func next()->(UInt32,UInt32) {
-        queue.sync {
+        counterQueue.sync {
             value = value + 1
             if value == UInt32.max{
                 value = 0
@@ -54,7 +68,7 @@ struct ProcessIDCounter {
         return (value,creation)
     }
 }
-
+//The global thread-safe process counter for the entire application
 var pidCounter = ProcessIDCounter()
 
 public struct Pid:Hashable,Equatable {
@@ -188,7 +202,6 @@ struct Registrar{
     var processesRegisteredByPid:[Pid:SwErlProcess] = [:]
     var processesRegisteredByName:[String:Pid] = [:]
     var OTPActorsRegisteredByPid:[Pid:(OTPActor_behavior.Type,Any?)] = [:]
-    var OTPActorsRegisteredByName:[String:Pid] = [:]//get rid of this it is a duplicate
     static func register(_ toBeAdded:SwErlProcess, PID:Pid)throws{
         guard Registrar.getProcess(forID: PID) == nil else{
             throw SwErlError.processAlreadyRegistered
@@ -209,7 +222,7 @@ struct Registrar{
             throw SwErlError.processAlreadyRegistered
         }
         instance.OTPActorsRegisteredByPid.updateValue(toBeAdded, forKey: PID)
-        instance.OTPActorsRegisteredByName.updateValue(PID, forKey: name)
+        instance.processesRegisteredByName.updateValue(PID, forKey: name)
         return PID
     }
     
@@ -217,10 +230,10 @@ struct Registrar{
         instance.processesRegisteredByPid.removeValue(forKey: registrationID)
     }
     static func remove(_ OTPName:String){
-        guard let PID = instance.OTPActorsRegisteredByName[OTPName] else{
+        guard let PID = instance.processesRegisteredByName[OTPName] else{
             return
         }
-        instance.OTPActorsRegisteredByName.removeValue(forKey: OTPName)
+        instance.processesRegisteredByName.removeValue(forKey: OTPName)
         instance.OTPActorsRegisteredByPid.removeValue(forKey: PID)
         
     }
