@@ -1,0 +1,33 @@
+{
+  "configurations" : [
+    {
+      "id" : "A9E0429F-1386-4BE2-B024-45D7B15DC397",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "SwErlTests",
+        "name" : "SwErlTests"
+      }
+    },
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "SwErlStatemTests",
+        "name" : "SwErlStatemTests"
+      }
+    }
+  ],
+  "version" : 1
+}
