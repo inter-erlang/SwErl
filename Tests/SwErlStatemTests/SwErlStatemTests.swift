@@ -10,8 +10,8 @@ import XCTest
 
 //dummy statem_behavior used across several tests
 enum Tester_statem:statem_behavior{
-    static func start_link(queueToUse: DispatchQueue?, name: String, actor_type: SwErl.statem_behavior, initial_data: Any) throws -> SwErl.Pid? {
-        nil
+    static func start_link(queueToUse: DispatchQueue?, name: String, initial_data: Any) throws -> SwErl.Pid? {
+        try gen_statem.start_link(name: name, actor_type: Tester_statem.self, initial_data: initial_data)
     }
     
     static func unlink(reason: String, current_state: Any) {
@@ -131,24 +131,56 @@ final class SwErlStatemTests: XCTestCase {
     }
 
     func testPerformanceExample() throws {
-       /*
-        print("\n\n\n!!!!!!!!!!!!!!!!!!! \nsize of SwErlProcess: \(MemoryLayout<SwErlProcess>.size ) bytes")
         
-        let stateless = {@Sendable(procName:Pid, message:Any) in
-            return
+        //dummy statem_behavior used across several tests
+        enum Speed_statem:statem_behavior{
+            
+            static func cast(name:String,message:Any)throws{
+                try gen_statem.cast(name: name, message: message)
+            }
+            static func start_link(queueToUse: DispatchQueue?, name: String, initial_data: Any) throws -> SwErl.Pid? {
+                try gen_statem.start_link(name: name, actor_type: Speed_statem.self, initial_data: initial_data)
+            }
+            
+            static func unlink(reason: String, current_state: Any) {
+                
+            }
+            
+            
+            static func initialize_state(initial_data: Any) -> Any {
+                initial_data
+            }
+            
+            static func handle_event_cast(message: Any, current_state: Any) -> Any {
+                return current_state
+            }
+            
+            
         }
-        let stateful = {@Sendable (pid:Pid,state:Any,message:Any)->Any in
-            return 7
-        }
+        
+        print("\n\n\n!!!!!!!!!!!!!!!!!!! \nsize of registered statem_behavior  instances not including state data size: \(MemoryLayout<Tester_statem>.size + MemoryLayout<DispatchQueue>.size) bytes")
+        
         let timer = ContinuousClock()
         let count:Int64 = 1000000
+        let names = (0..<1000000).map({"name\($0)"})
         var time = try timer.measure{
-            for _ in 0..<count{
-                _ = try spawn(function: stateless)
+            for name in names{
+                _ = try Speed_statem.start_link(queueToUse: nil, name: name, initial_data: 3)
             }
         }
-        print("stateless spawning took \(time.components.attoseconds/count) attoseconds per instantiation")
+        print("statem linking took \(time.components.attoseconds/count) attoseconds per link")
         
+        //clear out the registrar links
+        Registrar.instance.OTPActorsLinkedToPid = [:]
+        Registrar.instance.processesLinkedToName = [:]
+        let castTester = try Speed_statem.start_link(queueToUse: nil, name: "caster", initial_data: 3)
+        time = try timer.measure{
+            for _ in 0..<count{
+                _ = try Speed_statem.cast(name: "caster", message: 3)
+            }
+        }
+        print("casting to statem took \(time.components.attoseconds/count) attoseconds per cast")
+        /*
         time = try timer.measure{
             for _ in 0..<count{
                 _ = try spawn(initialState: 7, function: stateful)

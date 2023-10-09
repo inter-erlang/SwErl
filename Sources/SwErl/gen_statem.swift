@@ -35,7 +35,6 @@ public protocol statem_behavior:OTPActor_behavior{
        - Parameters:
         - queueToUse: the desired queue for the processes should use. Default:main()
          - name: a name to link to an occurance of the statem sub-type.
-         - actor_type: the sub-type of statem being linked to.
          - initial_data: any desired data used to initialize the statem sub-type occurance's state
       - Value: a Pid optional that uniquely identifies the occurance of the sub-type of gen\_statem the name is linked to
       - Throws: any exception thrown from the sub-type's _initialize\_state_ function
@@ -44,7 +43,7 @@ public protocol statem_behavior:OTPActor_behavior{
       - Version:
         0.1
      */
-    static func start_link(queueToUse:DispatchQueue?, name:String,actor_type:any statem_behavior,initial_data:Any)throws->Pid?
+    static func start_link(queueToUse:DispatchQueue?, name:String,initial_data:Any)throws->Pid?
     
     /**
      This hook function is used to do logic, if any, required to convert the _initial\_data_ passed to the generic state machine sub-type's _start\_link_ function to an initial state for the sub-type occurance.
