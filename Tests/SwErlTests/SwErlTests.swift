@@ -214,8 +214,8 @@ final class SwErlTests: XCTestCase {
         }
         XCTAssertNil(stateful.statelessLambda)
         XCTAssertNotNil(stateful.state)
-         XCTAssertTrue(["eggs","flour"] == stateful.state as! [String])
-        XCTAssertEqual(stateful.queue, statefulProcessDispatchQueue)
+        XCTAssertTrue(["eggs","flour"] == stateful.state as! [String])
+        XCTAssertEqual(stateful.queue.label, Pid.to_string(hasState))
         XCTAssertEqual(stateful.registeredPid, hasState)
         XCTAssertNotNil(stateful.statefulLambda)
         XCTAssertTrue(stateful.statefulLambda!(hasState,"butter",["salt","water"]) as!(Bool,[String]) == (true,["salt","water","butter"]))
@@ -230,8 +230,8 @@ final class SwErlTests: XCTestCase {
             }
         XCTAssertNil(stateful.statelessLambda)
         XCTAssertNotNil(stateful.state)
-         XCTAssertTrue(["eggs","flour"] == stateful.state as! [String])
-        XCTAssertEqual(stateful.queue, DispatchQueue.main)
+        XCTAssertTrue(["eggs","flour"] == stateful.state as! [String])
+        XCTAssertEqual(stateful.queue.label, Pid.to_string(hasState))
         XCTAssertEqual(stateful.registeredPid, hasState)
         XCTAssertNotNil(stateful.statefulLambda)
         XCTAssertTrue(stateful.statefulLambda!(hasState,"butter",["salt","water"]) as!(Bool,[String]) == (true,["salt","water","butter"]))

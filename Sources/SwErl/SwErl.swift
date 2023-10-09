@@ -88,6 +88,10 @@ public struct Pid:Hashable,Equatable {
     let id:UInt32
     let serial:UInt32
     let creation:UInt32
+    
+    static func to_string(_ PID:Pid) -> String {
+        "\(PID.id),\(PID.serial),\(PID.creation)"
+    }
 }
 /**
  This enum contains the two locations a process where the process is linked. If the process is accessed only within the node where it is linked, then _local_ is the appropriate linking indicator. If the process is available to be used from other nodes, _global_ is the appropriate linking indicator.
@@ -231,11 +235,18 @@ struct SwErlProcess{
     var state:Any?
     let registeredPid:Pid
     
-    init(queueToUse:DispatchQueue = statefulProcessDispatchQueue,
+    //
+    //stateful lambdas have a serial dispatch queue unique to themselves that,
+    //by default, feeds the global async dispatch queue. Since there is no
+    //serial queue shared by all stateful processes, no process is required to
+    //wait for all the other stateful process requests to complete before it can
+    //complete. Yet each state is serially maintained.
+    init(queueToUse:DispatchQueue = DispatchQueue.global(),
          registrationID:Pid,
          initialState:Any,
          functionality: @escaping @Sendable (Pid,Any,Any) -> Any) throws {//the returned value is used as the next state.
-        self.queue = queueToUse
+        //self.queue = queueToUse
+        self.queue = DispatchQueue(label: Pid.to_string(registrationID) ,target: queueToUse)
         self.statefulLambda = functionality
         self.state = initialState
         self.registeredPid = registrationID
@@ -267,7 +278,7 @@ struct Registrar{
     static var instance:Registrar = Registrar()
     var processesLinkedToPid:[Pid:SwErlProcess] = [:]
     var processesLinkedToName:[String:Pid] = [:]
-    var OTPActorsLinkedToPid:[Pid:(OTPActor_behavior.Type,Any?)] = [:]
+    var OTPActorsLinkedToPid:[Pid:(OTPActor_behavior.Type,DispatchQueue,Any?)] = [:]
     
     /*
      The Registrar's link functions should only be used from within the spawn function. They should not be called directly.
@@ -285,15 +296,12 @@ struct Registrar{
         try Registrar.link(toBeAdded, PID: PID)
         instance.processesLinkedToName.updateValue(PID, forKey: name)
     }
-    static func link<T:OTPActor_behavior>(_ toBeAdded:(T.Type,Any?), name:String)throws->Pid{
-        let (aSerial,aCreation) = pidCounter.next()
-        let PID = Pid(id: 0,serial: aSerial,creation: aCreation)
+    static func link<T:OTPActor_behavior>(_ toBeAdded:(T.Type,DispatchQueue,Any?), name:String, PID:Pid)throws{
         guard Registrar.getProcess(forID: name) == nil else{
             throw SwErlError.processAlreadyLinked
         }
         instance.OTPActorsLinkedToPid.updateValue(toBeAdded, forKey: PID)
         instance.processesLinkedToName.updateValue(PID, forKey: name)
-        return PID
     }
     /**
      This function is used to remove the link between a Pid and a SwErl process. The process is also removed.
@@ -393,11 +401,4 @@ struct Registrar{
         return instance.processesLinkedToName.keys
     }
 }
-
-
-
-///
-///here is the single instance of the stateful dispatch queue.
-///
-public let statefulProcessDispatchQueue = DispatchQueue(label: "statefulDispatchQueue",qos: .default)
 

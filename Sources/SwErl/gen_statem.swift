@@ -113,8 +113,12 @@ public enum gen_statem:OTPActor_behavior{
      */
     static func start_link<T:statem_behavior>(queueToUse:DispatchQueue = DispatchQueue.global(),name:String,actor_type:T.Type,initial_data:Any) throws->Pid{
         let initial_state = try actor_type.initialize_state(initial_data: initial_data)
-        //register the actor by name. name => (actor_type,initial_data)
-        return try Registrar.link((actor_type,initial_state),name: name)
+        //register the actor by name.
+        let (aSerial,aCreation) = pidCounter.next()
+        let PID = Pid(id: 0,serial: aSerial,creation: aCreation)
+        let queue_to_use = DispatchQueue(label: Pid.to_string(PID) ,target: queueToUse)
+        try Registrar.link((actor_type,queue_to_use,initial_state),name: name, PID: PID)
+        return PID
     }
     /**
      This function unlinks the information of an occurance of a generic state machine's sub-type. Other occurances of the sub-type registered under other names are unaffected.
@@ -134,7 +138,7 @@ public enum gen_statem:OTPActor_behavior{
         guard let PID = Registrar.instance.processesLinkedToName[name] else{
             return//Quiely fail since the statem was not registered
         }
-        guard let (type,stored_state) = Registrar.instance.OTPActorsLinkedToPid[PID] else{
+        guard let (type,_,stored_state) = Registrar.instance.OTPActorsLinkedToPid[PID] else{
             return//Quiely fail since the statem was not registered
         }
         guard let statem = type as? statem_behavior.Type else{
@@ -163,7 +167,7 @@ public enum gen_statem:OTPActor_behavior{
             throw SwErlError.nameNotRegistered
         }
         //if the pid hasn't been registered correctly, throw an exception.
-        guard let (type,stored_state) = Registrar.instance.OTPActorsLinkedToPid[PID] else{
+        guard let (type,dis_queue,stored_state) = Registrar.instance.OTPActorsLinkedToPid[PID] else{
             throw SwErlError.notRegisteredByPid
         }
         
@@ -177,8 +181,10 @@ public enum gen_statem:OTPActor_behavior{
         guard let state = stored_state else{
             throw SwErlError.statem_behaviorWithoutState
         }
-        let updated_state = statem.handle_event_cast(message: message, current_state: state)
-        Registrar.instance.OTPActorsLinkedToPid.updateValue((statem,updated_state), forKey: PID)
+        dis_queue.sync {
+            let updated_state = statem.handle_event_cast(message: message, current_state: state)
+            Registrar.instance.OTPActorsLinkedToPid.updateValue((statem,dis_queue,updated_state), forKey: PID)
+        }
     }
 }
 
