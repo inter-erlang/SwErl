@@ -36,13 +36,17 @@ final class SwErlStatemTests: XCTestCase {
     override func setUp() {
         // Clear the Registrar and reset the pidCounter
         // Set up any synchronous per-test state here.
-        Registrar.instance.processesRegisteredByPid = [:]
+        Registrar.instance.processesLinkedToName = [:]
+        Registrar.instance.processesLinkedToPid = [:]
+        Registrar.instance.OTPActorsLinkedToPid = [:]
         pidCounter = ProcessIDCounter()
      }
     
     override func tearDown() {
         // Clear the Registrar and reset the pidCounter
-        Registrar.instance.processesRegisteredByPid = [:]
+        Registrar.instance.processesLinkedToName = [:]
+        Registrar.instance.processesLinkedToPid = [:]
+        Registrar.instance.OTPActorsLinkedToPid = [:]
         pidCounter = ProcessIDCounter()
      }
 
@@ -54,8 +58,8 @@ final class SwErlStatemTests: XCTestCase {
         //Happy path
         let PID = try gen_statem.start_link(name: "some_name", actor_type: Tester_statem.self, initial_data: ("bob",13,(22,45)))
         XCTAssertEqual(Pid(id: 0,serial: 1,creation: 0),PID)
-        XCTAssertEqual(PID, Registrar.instance.processesRegisteredByName["some_name"])
-        let (aType,Data) = Registrar.instance.OTPActorsRegisteredByPid[PID]!
+        XCTAssertEqual(PID, Registrar.instance.processesLinkedToName["some_name"])
+        let (aType,Data) = Registrar.instance.OTPActorsLinkedToPid[PID]!
         XCTAssertNoThrow(aType as! Tester_statem.Type)
         let (name,age,(x,y)) = Data! as! (String, Int, (Int, Int))
         XCTAssertEqual("bob",name)
@@ -73,29 +77,29 @@ final class SwErlStatemTests: XCTestCase {
         //setup case
         //happy setup
         let PID = Pid(id: 0,serial: 1,creation: 0)
-        Registrar.instance.OTPActorsRegisteredByPid[PID] = (Tester_statem.self as statem_behavior.Type,"hello")
-        Registrar.instance.processesRegisteredByName["some_name"] = PID
+        Registrar.instance.OTPActorsLinkedToPid[PID] = (Tester_statem.self as statem_behavior.Type,"hello")
+        Registrar.instance.processesLinkedToName["some_name"] = PID
         
         //nasty setup: no state
         
         let PID2 = Pid(id: 0,serial: 2,creation: 0)
-        Registrar.instance.OTPActorsRegisteredByPid[PID2] = (Tester_statem.self as statem_behavior.Type,nil)
-        Registrar.instance.processesRegisteredByName["stateless"] = PID2
+        Registrar.instance.OTPActorsLinkedToPid[PID2] = (Tester_statem.self as statem_behavior.Type,nil)
+        Registrar.instance.processesLinkedToName["stateless"] = PID2
         
         //nasty setup: not a statem
         let PID3 = Pid(id: 0,serial: 3,creation: 0)
-        Registrar.instance.OTPActorsRegisteredByPid[PID3] = (Not_statem.self as Not_statem.Type,"hello")
-        Registrar.instance.processesRegisteredByName["not_statem"] = PID3
+        Registrar.instance.OTPActorsLinkedToPid[PID3] = (Not_statem.self as Not_statem.Type,"hello")
+        Registrar.instance.processesLinkedToName["not_statem"] = PID3
         
         
         //nasty setup: not a statem
         let PID4 = Pid(id: 0,serial: 4,creation: 0)
-        Registrar.instance.processesRegisteredByName["no_pid"] = PID4
+        Registrar.instance.processesLinkedToName["no_pid"] = PID4
         
         
         //Happy path
         try gen_statem.cast(name: "some_name", message: 50)
-        let (_, current_state) = Registrar.instance.OTPActorsRegisteredByPid[PID]!
+        let (_, current_state) = Registrar.instance.OTPActorsLinkedToPid[PID]!
         XCTAssertEqual("executed", current_state as! String)
         
         //Nasty thoughts start here
@@ -109,15 +113,15 @@ final class SwErlStatemTests: XCTestCase {
     
     func testUnlink() throws{
         let PID = Pid(id: 0,serial: 1,creation: 0)
-        Registrar.instance.OTPActorsRegisteredByPid[PID] = (Tester_statem.self as statem_behavior.Type,"hello")
-        Registrar.instance.processesRegisteredByName["some_name"] = PID
+        Registrar.instance.OTPActorsLinkedToPid[PID] = (Tester_statem.self as statem_behavior.Type,"hello")
+        Registrar.instance.processesLinkedToName["some_name"] = PID
         
         //happy path
-        XCTAssertEqual(1, Registrar.instance.processesRegisteredByName.count)
-        XCTAssertEqual(1, Registrar.instance.OTPActorsRegisteredByPid.count)
+        XCTAssertEqual(1, Registrar.instance.processesLinkedToName.count)
+        XCTAssertEqual(1, Registrar.instance.OTPActorsLinkedToPid.count)
         XCTAssertNoThrow(gen_statem.unlink(name: "some_name", reason: "testing"))
-        XCTAssertEqual(0, Registrar.instance.processesRegisteredByName.count)
-        XCTAssertEqual(0, Registrar.instance.OTPActorsRegisteredByPid.count)
+        XCTAssertEqual(0, Registrar.instance.processesLinkedToName.count)
+        XCTAssertEqual(0, Registrar.instance.OTPActorsLinkedToPid.count)
         
         //nasty thoughts start here
         XCTAssertNoThrow(gen_statem.unlink(name: "not_linked", reason: "testing"))
