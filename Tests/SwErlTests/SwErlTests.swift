@@ -1,22 +1,46 @@
+//
+//  SwErlTests.swift
+//
+//Copyright (c) 2023 Lee Barney
+//
+//Permission is hereby granted, free of charge, to any person obtaining a copy
+//of this software and associated documentation files (the "Software"), to deal
+//in the Software without restriction, including without limitation the rights
+//to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+//copies of the Software, and to permit persons to whom the Software is
+//furnished to do so, subject to the following conditions:
+//
+//The above copyright notice and this permission notice shall be included in all
+//copies or substantial portions of the Software.
+//
+//THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+//IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+//FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+//AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+//LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+//OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+//SOFTWARE.
+//
+//  Created by Lee Barney on 2/24/23.
+//
+
 import XCTest
 @testable import SwErl
+
+
 
 final class SwErlTests: XCTestCase {
     
     override func setUp() {
         
-        // This is the setUp() instance method.
-        // XCTest calls it before each test method.
-        // Set up any synchronous per-test state here.
-        Registrar.instance.processesRegisteredByPid = [:]
+        // Clear the Registrar and the counter for the PIDs
+        Registrar.instance.processesLinkedToPid = [:]
         pidCounter = ProcessIDCounter()
      }
     
     override func tearDown() {
-        // This is the tearDown() instance method.
-        // XCTest calls it after each test method.
-        // Perform any synchronous per-test cleanup here.
-        Registrar.instance.processesRegisteredByPid = [:]
+        // Clear the Registrar and the counter for the PIDs
+        Registrar.instance.processesLinkedToPid = [:]
         pidCounter = ProcessIDCounter()
      }
     
@@ -41,7 +65,7 @@ final class SwErlTests: XCTestCase {
             print("hello \(message)")
             return
         }
-        XCTAssertEqual(1,Registrar.instance.processesRegisteredByPid.count)
+        XCTAssertEqual(1,Registrar.instance.processesLinkedToPid.count)
         XCTAssertEqual(Pid(id: 0, serial: 1, creation: 0), PID)
     }
     
@@ -50,7 +74,7 @@ final class SwErlTests: XCTestCase {
         let _ = try spawn(initialState: 3){(procName, message,state) in
             return (true,5)
         }
-        XCTAssertEqual(1,Registrar.instance.processesRegisteredByPid.count)
+        XCTAssertEqual(1,Registrar.instance.processesLinkedToPid.count)
         
     }
     func testHappyPathSpawnWithName() throws {
@@ -58,7 +82,7 @@ final class SwErlTests: XCTestCase {
             print("hello \(message)")
             return
         }
-        XCTAssertEqual(1,Registrar.instance.processesRegisteredByName.count)
+        XCTAssertEqual(1,Registrar.instance.processesLinkedToName.count)
     }
     
     
@@ -100,7 +124,7 @@ final class SwErlTests: XCTestCase {
             secondPid ! message
             return
         }
-        XCTAssertEqual(2, Registrar.instance.processesRegisteredByPid.count)
+        XCTAssertEqual(2, Registrar.instance.processesLinkedToPid.count)
         
         initialPid ! "Sue"
         wait(for: [expectation], timeout: 10.0)
@@ -140,19 +164,19 @@ final class SwErlTests: XCTestCase {
         let stateless = try SwErlProcess(registrationID: anID){(name, message) in
             return
         }
-        XCTAssertNoThrow(try Registrar.register(stateless, PID: anID))
+        XCTAssertNoThrow(try Registrar.link(stateless, PID: anID))
         XCTAssertNoThrow(anID ! "hello")
-        XCTAssertNotNil(Registrar.instance.processesRegisteredByPid[anID])
+        XCTAssertNotNil(Registrar.instance.processesLinkedToPid[anID])
         
         let stopperID = Pid(id: 0, serial: 2, creation: 0)
         let stopper = try SwErlProcess(registrationID: stopperID){(name, message) in
             return
         }
-        XCTAssertNoThrow(try Registrar.register(stopper, PID: stopperID))
+        XCTAssertNoThrow(try Registrar.link(stopper, PID: stopperID))
         XCTAssertNoThrow(stopperID ! "hello")
         
-        XCTAssertNotNil(Registrar.instance.processesRegisteredByPid[stopperID])
-        XCTAssertEqual(2, Registrar.instance.processesRegisteredByPid.count)
+        XCTAssertNotNil(Registrar.instance.processesLinkedToPid[stopperID])
+        XCTAssertEqual(2, Registrar.instance.processesLinkedToPid.count)
     }
     
     func testStatelessSwerlProcessWithDefaults() throws {
@@ -190,8 +214,8 @@ final class SwErlTests: XCTestCase {
         }
         XCTAssertNil(stateful.statelessLambda)
         XCTAssertNotNil(stateful.state)
-         XCTAssertTrue(["eggs","flour"] == stateful.state as! [String])
-        XCTAssertEqual(stateful.queue, statefulProcessDispatchQueue)
+        XCTAssertTrue(["eggs","flour"] == stateful.state as! [String])
+        XCTAssertEqual(stateful.queue.label, Pid.to_string(hasState))
         XCTAssertEqual(stateful.registeredPid, hasState)
         XCTAssertNotNil(stateful.statefulLambda)
         XCTAssertTrue(stateful.statefulLambda!(hasState,"butter",["salt","water"]) as!(Bool,[String]) == (true,["salt","water","butter"]))
@@ -206,8 +230,8 @@ final class SwErlTests: XCTestCase {
             }
         XCTAssertNil(stateful.statelessLambda)
         XCTAssertNotNil(stateful.state)
-         XCTAssertTrue(["eggs","flour"] == stateful.state as! [String])
-        XCTAssertEqual(stateful.queue, DispatchQueue.main)
+        XCTAssertTrue(["eggs","flour"] == stateful.state as! [String])
+        XCTAssertEqual(stateful.queue.label, Pid.to_string(hasState))
         XCTAssertEqual(stateful.registeredPid, hasState)
         XCTAssertNotNil(stateful.statefulLambda)
         XCTAssertTrue(stateful.statefulLambda!(hasState,"butter",["salt","water"]) as!(Bool,[String]) == (true,["salt","water","butter"]))
@@ -217,7 +241,7 @@ final class SwErlTests: XCTestCase {
         let first = Pid(id: 0, serial: 1, creation: 0)
         let second = Pid(id: 0, serial: 2, creation: 0)
         let third = Pid(id: 0, serial: 3, creation: 0)
-        XCTAssertEqual(Registrar.instance.processesRegisteredByPid.count, 0)
+        XCTAssertEqual(Registrar.instance.processesLinkedToPid.count, 0)
         let firstProc = try SwErlProcess(registrationID: first){(procName, message) in
             return
         }
@@ -227,22 +251,22 @@ final class SwErlTests: XCTestCase {
         let thirdProc = try SwErlProcess(registrationID: third){(procName, message) in
             return
         }
-        XCTAssertNil(Registrar.instance.processesRegisteredByPid[first])
-        XCTAssertNil(Registrar.instance.processesRegisteredByPid[second])
-        XCTAssertNil(Registrar.instance.processesRegisteredByPid[third])
+        XCTAssertNil(Registrar.instance.processesLinkedToPid[first])
+        XCTAssertNil(Registrar.instance.processesLinkedToPid[second])
+        XCTAssertNil(Registrar.instance.processesLinkedToPid[third])
         
-        XCTAssertNoThrow(try Registrar.register(firstProc, PID: first))
-        XCTAssertNoThrow(try Registrar.register(secondProc, PID: second))
-        XCTAssertNoThrow(try Registrar.register(thirdProc, PID: third))
-        
-        
-        XCTAssertNotNil(Registrar.instance.processesRegisteredByPid[first])
-        XCTAssertNotNil(Registrar.instance.processesRegisteredByPid[second])
-        XCTAssertNotNil(Registrar.instance.processesRegisteredByPid[third])
-        XCTAssertEqual(3, Registrar.instance.processesRegisteredByPid.count)
+        XCTAssertNoThrow(try Registrar.link(firstProc, PID: first))
+        XCTAssertNoThrow(try Registrar.link(secondProc, PID: second))
+        XCTAssertNoThrow(try Registrar.link(thirdProc, PID: third))
         
         
-        XCTAssertThrowsError(try Registrar.register(thirdProc, PID: third))
+        XCTAssertNotNil(Registrar.instance.processesLinkedToPid[first])
+        XCTAssertNotNil(Registrar.instance.processesLinkedToPid[second])
+        XCTAssertNotNil(Registrar.instance.processesLinkedToPid[third])
+        XCTAssertEqual(3, Registrar.instance.processesLinkedToPid.count)
+        
+        
+        XCTAssertThrowsError(try Registrar.link(thirdProc, PID: third))
         
         XCTAssertTrue(Registrar.getAllPIDs().contains(first))
         XCTAssertTrue(Registrar.getAllPIDs().contains(second))
@@ -252,7 +276,7 @@ final class SwErlTests: XCTestCase {
         XCTAssertNotNil(Registrar.getProcess(forID: second))
         XCTAssertNil(Registrar.getProcess(forID: Pid(id: 0, serial: 0, creation: 0)))
         
-        XCTAssertNoThrow(Registrar.remove(second))
+        XCTAssertNoThrow(Registrar.unlink(second))
         XCTAssertNil(Registrar.getProcess(forID: second))
         XCTAssertEqual(2, Registrar.getAllPIDs().count)
         
@@ -272,9 +296,12 @@ final class SwErlTests: XCTestCase {
         pid ! 5.0
         pid ! 2.0
         pid ! 0.0
+        
 
         XCTAssertEqual("5.0,2.0,0.0", Registrar.getProcess(forID: pid)?.state as! String)
     }
+    
+    
     
     @available(macOS 13.0, *)
     func testSizeAndSpeed() throws{
@@ -289,54 +316,65 @@ final class SwErlTests: XCTestCase {
         }
         let timer = ContinuousClock()
         let count:Int64 = 1000000
-        var time = try timer.measure{
-            for _ in 0..<count{
+        var totalTime:Int64 = 0
+        for _ in 0..<count{
+            let time = try timer.measure{
                 _ = try spawn(function: stateless)
             }
+            totalTime = totalTime + time.components.attoseconds
         }
-        print("stateless spawning took \(time.components.attoseconds/count) attoseconds per instantiation")
-        
-        time = try timer.measure{
-            for _ in 0..<count{
+        print("stateless spawning took \(totalTime/count) attoseconds per instantiation")
+        totalTime = 0
+        for _ in 0..<count{
+            let time = try timer.measure{
                 _ = try spawn(initialState: 7, function: stateful)
             }
+            totalTime = totalTime + time.components.attoseconds
         }
-        print("stateful spawning took \(time.components.attoseconds/count) attoseconds per instantiation\n!!!!!!!!!!!!!!!!!!!\n\n\n")
-        Registrar.instance.processesRegisteredByPid = [:]//clear the million registered processes
+        print("stateful spawning took \(totalTime/count) attoseconds per instantiation\n!!!!!!!!!!!!!!!!!!!\n\n\n")
+        Registrar.instance.processesLinkedToPid = [:]//clear the million registered processes
         print("!!!!!!!!!!!!!!!!!!! \n Sending \(count) messages to stateful process")
         var Pid = try spawn(initialState: 7, function: stateful)
-        time = timer.measure{
-            for _ in 0..<count{
+        totalTime = 0
+        for _ in 0..<count{
+            let time = timer.measure{
                 Pid ! 3
             }
+            totalTime = totalTime + time.components.attoseconds
         }
-        print(" Stateful message passing took \(time.components.attoseconds/count) attoseconds per message sent\n!!!!!!!!!!!!!!!!!!!\n\n\n")
+        print(" Stateful SwErl message passing took \(totalTime/count) attoseconds per message sent\n!!!!!!!!!!!!!!!!!!!\n\n\n")
         
         print("!!!!!!!!!!!!!!!!!!! \n Sending \(count) messages to stateless process")
         Pid = try spawn(function: stateless)
-        time = timer.measure{
-            for _ in 0..<count{
+        totalTime = 0
+        for _ in 0..<count{
+            let time = timer.measure{
                 Pid ! 3
             }
+            totalTime = totalTime + time.components.attoseconds
         }
-        print(" Stateless message passing took \(time.components.attoseconds/count) attoseconds per message sent\n!!!!!!!!!!!!!!!!!!!\n\n\n")
-        time = timer.measure{
-            for _ in 0..<count{
+        print(" Stateless SwErl message passing took \(totalTime/count) attoseconds per message sent\n!!!!!!!!!!!!!!!!!!!\n\n\n")
+        totalTime = 0
+        for _ in 0..<count{
+            let time = timer.measure{
                 Task {
                     await duplicateStatelessProcessBehavior(message:"hello")
                 }
             }
+            totalTime = totalTime + time.components.attoseconds
         }
-        print("Async/await in Tasks took \(time.components.attoseconds/count) attoseconds per task started\n!!!!!!!!!!!!!!!!!!!\n\n\n")
-        time = timer.measure{
-            for _ in 0..<count{
+        print("stateless Async/await took \(totalTime/count) attoseconds per task started\n!!!!!!!!!!!!!!!!!!!\n\n\n")
+        totalTime = 0
+        for _ in 0..<count{
+            let time = timer.measure{
                 DispatchQueue.global().async {
                     self.doNothing()
                     
                 }
             }
+            totalTime = totalTime + time.components.attoseconds
         }
-        print("Using dispatch queue only took \(time.components.attoseconds/count) attoseconds per call started\n!!!!!!!!!!!!!!!!!!!\n\n\n")
+        print("Stateless dispatch queue took \(totalTime/count) attoseconds per call started\n!!!!!!!!!!!!!!!!!!!\n\n\n")
         
     }
     
@@ -346,4 +384,5 @@ final class SwErlTests: XCTestCase {
     func doNothing(){
         return
     }
+
 }
