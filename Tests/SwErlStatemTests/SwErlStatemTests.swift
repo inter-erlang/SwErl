@@ -162,24 +162,29 @@ final class SwErlStatemTests: XCTestCase {
         
         let timer = ContinuousClock()
         let count:Int64 = 1000000
+        var linkTime:Int64 = 0
         let names = (0..<1000000).map({"name\($0)"})
-        var time = try timer.measure{
-            for name in names{
+        for name in names{
+            let time = try timer.measure{
                 _ = try Speed_statem.start_link(queueToUse: nil, name: name, initial_data: 3)
             }
+            linkTime = linkTime + time.components.attoseconds
         }
-        print("statem linking took \(time.components.attoseconds/count) attoseconds per link")
+        print("statem linking took \(linkTime/count) attoseconds per link")
         
         //clear out the registrar links
         Registrar.instance.OTPActorsLinkedToPid = [:]
         Registrar.instance.processesLinkedToName = [:]
-        let castTester = try Speed_statem.start_link(queueToUse: nil, name: "caster", initial_data: 3)
-        time = try timer.measure{
-            for _ in 0..<count{
+        let _ = try Speed_statem.start_link(queueToUse: nil, name: "caster", initial_data: 3)
+        var castingTime:Int64 = 0
+        for _ in 0..<count{
+            let time = try timer.measure{
                 _ = try Speed_statem.cast(name: "caster", message: 3)
             }
+            castingTime = castingTime + time.components.attoseconds
         }
-        print("casting to statem took \(time.components.attoseconds/count) attoseconds per cast")
+        
+        print("casting to statem took \(castingTime/count) attoseconds per cast")
         /*
         time = try timer.measure{
             for _ in 0..<count{

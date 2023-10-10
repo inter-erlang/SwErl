@@ -316,54 +316,65 @@ final class SwErlTests: XCTestCase {
         }
         let timer = ContinuousClock()
         let count:Int64 = 1000000
-        var time = try timer.measure{
-            for _ in 0..<count{
+        var totalTime:Int64 = 0
+        for _ in 0..<count{
+            let time = try timer.measure{
                 _ = try spawn(function: stateless)
             }
+            totalTime = totalTime + time.components.attoseconds
         }
-        print("stateless spawning took \(time.components.attoseconds/count) attoseconds per instantiation")
-        
-        time = try timer.measure{
-            for _ in 0..<count{
+        print("stateless spawning took \(totalTime/count) attoseconds per instantiation")
+        totalTime = 0
+        for _ in 0..<count{
+            let time = try timer.measure{
                 _ = try spawn(initialState: 7, function: stateful)
             }
+            totalTime = totalTime + time.components.attoseconds
         }
-        print("stateful spawning took \(time.components.attoseconds/count) attoseconds per instantiation\n!!!!!!!!!!!!!!!!!!!\n\n\n")
+        print("stateful spawning took \(totalTime/count) attoseconds per instantiation\n!!!!!!!!!!!!!!!!!!!\n\n\n")
         Registrar.instance.processesLinkedToPid = [:]//clear the million registered processes
         print("!!!!!!!!!!!!!!!!!!! \n Sending \(count) messages to stateful process")
         var Pid = try spawn(initialState: 7, function: stateful)
-        time = timer.measure{
-            for _ in 0..<count{
+        totalTime = 0
+        for _ in 0..<count{
+            let time = timer.measure{
                 Pid ! 3
             }
+            totalTime = totalTime + time.components.attoseconds
         }
-        print(" Stateful message passing took \(time.components.attoseconds/count) attoseconds per message sent\n!!!!!!!!!!!!!!!!!!!\n\n\n")
+        print(" Stateful SwErl message passing took \(totalTime/count) attoseconds per message sent\n!!!!!!!!!!!!!!!!!!!\n\n\n")
         
         print("!!!!!!!!!!!!!!!!!!! \n Sending \(count) messages to stateless process")
         Pid = try spawn(function: stateless)
-        time = timer.measure{
-            for _ in 0..<count{
+        totalTime = 0
+        for _ in 0..<count{
+            let time = timer.measure{
                 Pid ! 3
             }
+            totalTime = totalTime + time.components.attoseconds
         }
-        print(" Stateless message passing took \(time.components.attoseconds/count) attoseconds per message sent\n!!!!!!!!!!!!!!!!!!!\n\n\n")
-        time = timer.measure{
-            for _ in 0..<count{
+        print(" Stateless SwErl message passing took \(totalTime/count) attoseconds per message sent\n!!!!!!!!!!!!!!!!!!!\n\n\n")
+        totalTime = 0
+        for _ in 0..<count{
+            let time = timer.measure{
                 Task {
                     await duplicateStatelessProcessBehavior(message:"hello")
                 }
             }
+            totalTime = totalTime + time.components.attoseconds
         }
-        print("Async/await in Tasks took \(time.components.attoseconds/count) attoseconds per task started\n!!!!!!!!!!!!!!!!!!!\n\n\n")
-        time = timer.measure{
-            for _ in 0..<count{
+        print("stateless Async/await took \(totalTime/count) attoseconds per task started\n!!!!!!!!!!!!!!!!!!!\n\n\n")
+        totalTime = 0
+        for _ in 0..<count{
+            let time = timer.measure{
                 DispatchQueue.global().async {
                     self.doNothing()
                     
                 }
             }
+            totalTime = totalTime + time.components.attoseconds
         }
-        print("Using dispatch queue only took \(time.components.attoseconds/count) attoseconds per call started\n!!!!!!!!!!!!!!!!!!!\n\n\n")
+        print("Stateless dispatch queue took \(totalTime/count) attoseconds per call started\n!!!!!!!!!!!!!!!!!!!\n\n\n")
         
     }
     
