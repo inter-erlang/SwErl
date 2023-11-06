@@ -1,0 +1,87 @@
+//
+//  File.swift
+//  
+//
+//  Created by SwErl on 10/30/23.
+//
+import XCTest
+import Foundation
+
+@testable import SwErl
+
+
+
+
+final class Stop : XCTestCase {
+    override func setUp() {
+        resetRegistryAndPIDCounter()
+        try! GenServer.startLink("server", SimpleCastServer.self, nil)
+    }
+    
+    override func tearDown() {
+        resetRegistryAndPIDCounter()
+    }
+    
+    //end the process with an empty associated dispatch queue
+    func testEmptyQueue() {
+        GenServer.stop("server", "shutdown")
+        XCTAssert(Registrar.instance.OTPActorsLinkedToPid.isEmpty , "server ref not removed from pid:type dictionary")
+        XCTAssert(Registrar.instance.processesLinkedToName.isEmpty, "server ref not removed from name:pid dictionary")
+    }
+    
+    
+    func testError_nameAlreadyRegistered() {
+        
+    }
+}
+
+final class FilledQueueStop: XCTestCase {
+    //NOTE test case only valid when start_link and cast tests succeed.
+    //expectations:
+    // - Dispatch Queued tasks do not run
+    // - any calls (queue.sync()) recieve a noProc error
+    //end the process with items still remaining on the dispatch queue
+    
+    let noRun = XCTestExpectation(
+        description: "Inverted expectation: fails if code added to queue after stop ran.")
+    override func setUp() {
+        resetRegistryAndPIDCounter()
+        noRun.isInverted = true
+        try! GenServer.startLink("queue server", StopWithQueueSever.self, noRun)
+    }
+    override func tearDown() {
+        resetRegistryAndPIDCounter()
+    }
+    
+    func testOccupiedQueueCasts() {
+        try! GenServer.cast("queue server", "delay")
+        GenServer.stop("queue server", "shutdown")
+        try! GenServer.cast("queue server", "fulfill") //error not expected here
+        
+        wait(for: [noRun], timeout: 3) //inverted expectation
+    }
+    
+//    func testOccupiedQueueCalls() {
+//
+//    }
+}
+
+final class AlreadyRegistered: XCTestCase {
+    override func setUp() {
+        resetRegistryAndPIDCounter()
+        try! GenServer.startLink("already registered", SimpleCastServer.self, nil)
+    }
+    
+    override func tearDown() {
+        resetRegistryAndPIDCounter()
+    }
+    
+    func testAlreadyRegistered() {
+        XCTAssertThrowsError(
+            try GenServer.startLink("already registered", SimpleCastServer.self, nil),
+            "attempt to register already registered gen server did not error"){ (error) in
+                XCTAssertEqual(error as! SwErlError, SwErlError.processAlreadyLinked,
+                               "incorrect error type")
+            }
+    }
+}

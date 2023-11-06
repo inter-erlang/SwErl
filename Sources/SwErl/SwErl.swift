@@ -40,6 +40,7 @@ public enum SwErlError: Error {
     case processAlreadyLinked//there is a process currently registered with that name
     case nameNotRegistered
     case notRegisteredByPid
+    case notGenServer_behavior
     case notStatem_behavior
     case statem_behaviorWithoutState
 }
