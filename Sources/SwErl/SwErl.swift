@@ -41,7 +41,11 @@ public enum SwErlError: Error {
     case nameNotRegistered
     case notRegisteredByPid
     case notStatem_behavior
+    case notEventHandler_behavior
+    case notEventManager_behavior
     case statem_behaviorWithoutState
+    case invalidCommand
+    case invalidState
 }
 /**
  This struct implements a thread-safe counter for asyncronous process id's.
@@ -112,7 +116,7 @@ enum RegistrationType{
   - Version:
     0.1
  */
-enum SucceedFail{
+public enum SwErlPassed{
     case ok
     case fail
 }
@@ -175,40 +179,39 @@ public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),name:String?
  */
 infix operator ! : LogicalConjunctionPrecedence//this is left associative. That's why it has been chosen.
 extension Pid{
-    public static func !( lhs: Pid, rhs: Any){
-        guard var process = Registrar.getProcess(forID: lhs) else{
-            return
-        }
-        if let statefulClosure = process.statefulLambda{
+    
+    
+    @discardableResult public static func !( lhs: Pid, rhs: Any)->(SwErlPassed,Any?){
+        //!!!!!!!!!!!!!!!! modify this so it can work with a gen_server or a state_machine or an event manager.
+        if let (type,_,_) = Registrar.instance.OTPActorsLinkedToPid[lhs] as? (Messageable.Type,DispatchQueue,Any?){
             do{
-                process.state = try process.queue.sync(execute:{()throws->Any in
-                    return statefulClosure(lhs,process.state!,rhs)
-                })
-                Registrar.instance.processesLinkedToPid[lhs] = process
+                try type.notify(PID: lhs, message: rhs)
             }
             catch{
-                print("PID \(process.registeredPid) threw an error. SwErl processes are to deal with any throws that happen within themselves.")
+                return (SwErlPassed.fail,error)
             }
-            
+            return (SwErlPassed.ok,nil)
         }
-        else{
-            if let statelessClosure = process.statelessLambda{
-                process.queue.async {
-                    statelessClosure(process.registeredPid,rhs)
-                    
-                }
-            }
+        guard let process = Registrar.getProcess(forID: lhs) else{
+            return (SwErlPassed.fail,SwErlError.notRegisteredByPid)
         }
+        do{
+            try Registrar.executeProcess(process, lhs, rhs)
+        }
+        catch{
+            return (SwErlPassed.fail,error)
+        }
+        return (SwErlPassed.ok,nil)
     }
 }
 
 //this is a facade function that uses the pid-based function
 extension String{
-    public static func !( lhs: String, rhs: Any) {
+    @discardableResult public static func !( lhs: String, rhs: Any)->(SwErlPassed,Any?){
         guard let pid = Registrar.getPid(forName: lhs) else{
-            return
+            return (SwErlPassed.fail,SwErlError.nameNotRegistered)
         }
-        pid ! rhs
+        return pid ! rhs
     }
 }
 
@@ -227,7 +230,7 @@ struct SwErlProcess{
     ///
     ///this lambda has three parameters, self(the process' registered name), state and message.
     ///
-    var statefulLambda:((Pid,Any,Any)->Any)? = nil
+    var statefulLambda:((Pid,Any,Any)throws->Any)? = nil
     ///
     ///this lambda has two parameters. The first is the registered
     ///name, self, and the second is the message
@@ -244,7 +247,7 @@ struct SwErlProcess{
     init(queueToUse:DispatchQueue = DispatchQueue.global(),
          registrationID:Pid,
          initialState:Any,
-         functionality: @escaping @Sendable (Pid,Any,Any) -> Any) throws {//the returned value is used as the next state.
+         functionality: @escaping @Sendable (Pid,Any,Any)throws -> Any) throws {//the returned value is used as the next state.
         //self.queue = queueToUse
         self.queue = DispatchQueue(label: Pid.to_string(registrationID) ,target: queueToUse)
         self.statefulLambda = functionality
@@ -400,5 +403,24 @@ struct Registrar{
     static func getAllNames()->Dictionary<String, Pid>.Keys{
         return instance.processesLinkedToName.keys
     }
+    static func executeProcess(_ process: SwErlProcess, _ lhs: Pid, _ rhs: Any)throws{
+        if let statefulClosure = process.statefulLambda{
+            var mutableProcess = process
+            mutableProcess.state = try mutableProcess.queue.sync{()throws ->Any in
+                try statefulClosure(lhs,mutableProcess.state!,rhs)
+            }
+            Registrar.instance.processesLinkedToPid[lhs] = mutableProcess
+            
+        }
+        else{
+            if let statelessClosure = process.statelessLambda{
+                process.queue.async{()->Void in
+                    statelessClosure(process.registeredPid,rhs)
+                }
+            }
+        }
+    }
 }
+
+
 
