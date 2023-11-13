@@ -40,8 +40,7 @@ import Foundation
  These functions also ensure that each custom event manager is registered
  properly so it can be used from anywhere in the application's code base.
  */
-public enum event_manager:Messageable{
-    
+public enum event_manager:OTPActor_behavior{
     
     /**
      This function registers, by name, and prepares a specified event manager using a list, possibly empty, of SwErl stateful or stateless process' IDs. These processes are the handlers for the event managed by the manager. Once this function completes, the occurrance can be used. All functions applied to the occurrance will execute on the main or any other thread depending on the DispatchQueue stated. By default, the global queue will be used, but if the main() queue is passed as a parameter, the occurrance's functions will all run on the main/UI thread.
@@ -55,7 +54,7 @@ public enum event_manager:Messageable{
      - Version:
      0.1
      */
-    static func start_link(queueToUse:DispatchQueue = DispatchQueue.global(),name:String,intialHandlers:[Pid]) throws->Pid{
+    static func link(queueToUse:DispatchQueue = .global(),name:String,intialHandlers:[Pid]) throws -> Pid{
         //register the actor by name.
         let (aSerial,aCreation) = pidCounter.next()
         let PID = Pid(id: 0,serial: aSerial,creation: aCreation)
@@ -76,15 +75,16 @@ public enum event_manager:Messageable{
      - Version:
      0.1
      */
-    static func unlink(name:String, reason:String){
+    static func unlink(name:String){
         guard let PID = Registrar.instance.processesLinkedToName[name] else{
             return//Quiely fail since the statem was not registered
         }
+        let (blahtype,_,_) = Registrar.instance.OTPActorsLinkedToPid[PID]! 
         guard let (type,_,_) = Registrar.instance.OTPActorsLinkedToPid[PID] else{
-            return//Quiely fail since the statem was not registered
+            return//Quiely fail since the manager was not registered
         }
-        guard let _ = type as? event_manager.Type else{
-            return//Quiely fail since the statem was not registered
+        guard let manager = type as? event_manager.Type else{
+            return//Quiely fail since the manager was not registered
         }
         Registrar.unlink(name)
     }
@@ -94,7 +94,7 @@ public enum event_manager:Messageable{
      If the manager name does not match a linked occurrance of an event manager, nothing needs to be unlinked and the state of the application is still valid. Therefore, no exceptions are thrown.
      - Parameters:
      - to: a name of a registered occurrance of a  sub-type occurrance.
-     - closure: any function or closure that has as parameters a process ID and an Any. The Any is used to receive the message being sent to the handler. This closure has a Void return type.
+     - closure: any function or closure of type _(Pid,SwErlMessage)->()_
      - Value: Void
      - Author:
      Lee S. Barney
@@ -102,7 +102,7 @@ public enum event_manager:Messageable{
      0.1
      */
     static func add(to:String, handler:@Sendable @escaping (Pid,SwErlMessage)->()) throws{
-        try link(to: to){(dispQueue) in
+        try linkHandler(to: to){(dispQueue) in
             try spawn(queueToUse:dispQueue, function: handler)
         }
     }
@@ -113,20 +113,18 @@ public enum event_manager:Messageable{
      If the manager name does not match a linked occurrance of an event manager, nothing needs to be unlinked and the state of the application is still valid. Therefore, no exceptions are thrown.
      - Parameters:
      - to: a name of a registered occurrance of a  sub-type occurrance.
-     - closure: any function or closure that has as parameters a process ID and an Any. The Any is used to receive the message being sent to the handler. This closure has a Void return type.
+     - closure: any function or closure of type _(Pid,SwErlState,SwErlMessage)->SwErlState_. Closures of type _(Pid,SwErlState,SwErlMessage)->(SwErlResponse,SwErlState)_ can be added using this function, but the _SwErlResponse_ will be ignored when the closure is executed.
      - Value: Void
      - Author:
      Lee S. Barney
      - Version:
      0.1
      */
-    static func add(to:String, initialState:SwErlState, handler:@Sendable @escaping (Pid,SwErlState,SwErlMessage)->(SwErlResponse,SwErlState)) throws{
-        try link(to: to){(dispQueue) in
+    static func add(to:String, initialState:SwErlState, handler:@Sendable @escaping (Pid,SwErlState,SwErlMessage)->SwErlState) throws{
+        try linkHandler(to: to){(dispQueue) in
             try spawn(queueToUse:dispQueue, initialState: initialState, function: handler)
         }
     }
-    
-//TODO: create addHandler functions that allow a handler to use a defined dispatch queue
     
     
     /**
@@ -161,7 +159,7 @@ public enum event_manager:Messageable{
 //working function behind the facade functions
 //this is private to this file and is never to be used from anywhere but
 //from within the two existing addHandler facade functions.
-private func link(to:String, closure:(DispatchQueue)throws -> Pid) throws{
+private func linkHandler(to:String, closure:(DispatchQueue)throws -> Pid) throws{
     //find the Pid of the event_manager occurance
     guard let PID = Registrar.instance.processesLinkedToName[to] else{
         throw SwErlError.invalidState

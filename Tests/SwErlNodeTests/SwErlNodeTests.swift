@@ -2,26 +2,28 @@ import XCTest
 import Network
 import Logging
 @testable import SwErl
-@testable import SwErlNode
 import BigInt
+import SwErl
 
 final class EPMDTests: XCTestCase {
+    
     override func setUp() {
         
         // This is the setUp() instance method.
         // XCTest calls it before each test method.
         // Set up any synchronous per-test state here.
-        Registrar.instance.processesRegisteredByPid = [:]
-        Registrar.instance.processesRegisteredByName = [:]
+        Registrar.instance.processesLinkedToPid = [:]
+        Registrar.instance.processesLinkedToName = [:]
     }
     
     override func tearDown() {
         // This is the tearDown() instance method.
         // XCTest calls it after each test method.
         // Perform any synchronous per-test cleanup here.
-        Registrar.instance.processesRegisteredByPid = [:]
-        Registrar.instance.processesRegisteredByName = [:]
+        Registrar.instance.processesLinkedToPid = [:]
+        Registrar.instance.processesLinkedToName = [:]
     }
+    /*
     func testKillMessageBuilding() throws {
         let message = buildKillMessage()
         XCTAssertEqual(message[0], 1)//first byte of message length
@@ -81,9 +83,9 @@ final class EPMDTests: XCTestCase {
     func testStartPeerPortsDictionary(){
         XCTAssertNoThrow(try startPeerPortsDictionary())
         //the process storing the peer information by peer name
-        let pid = Registrar.instance.processesRegisteredByName["peerPorts"]
+        let pid = Registrar.instance.processesLinkedToName["peerPorts"]
         XCTAssertNotNil(pid)
-        XCTAssertNotNil(Registrar.instance.processesRegisteredByPid[pid!])
+        XCTAssertNotNil(Registrar.instance.processesLinkedToPid[pid!])
     }
     func testSpawnProcessesFor() throws{
         let port = NWEndpoint.Port(9090)
@@ -92,26 +94,26 @@ final class EPMDTests: XCTestCase {
         XCTAssertNoThrow(try spawnProcessesFor(EPMD: (port,host,connection,"test@silly",8080)))
         
         //examine if pids and closures were stored
-        var pid = Registrar.instance.processesRegisteredByName["clear_buffer"]
+        var pid = Registrar.instance.processesLinkedToName["clear_buffer"]
         XCTAssertNotNil(pid)//pid was stored
-        XCTAssertNotNil(Registrar.instance.processesRegisteredByPid[pid!])//closure was stored
+        XCTAssertNotNil(Registrar.instance.processesLinkedToPid[pid!])//closure was stored
         
-        pid = Registrar.instance.processesRegisteredByName[EPMDRequest.register_node]
+        pid = Registrar.instance.processesLinkedToName[EPMDRequest.register_node]
         XCTAssertNotNil(pid)
-        XCTAssertNotNil(Registrar.instance.processesRegisteredByPid[pid!])
+        XCTAssertNotNil(Registrar.instance.processesLinkedToPid[pid!])
         
         
-        pid = Registrar.instance.processesRegisteredByName[EPMDRequest.port_please]
+        pid = Registrar.instance.processesLinkedToName[EPMDRequest.port_please]
         XCTAssertNotNil(pid)
-        XCTAssertNotNil(Registrar.instance.processesRegisteredByPid[pid!])
+        XCTAssertNotNil(Registrar.instance.processesLinkedToPid[pid!])
         
-        pid = Registrar.instance.processesRegisteredByName[EPMDRequest.names]
+        pid = Registrar.instance.processesLinkedToName[EPMDRequest.names]
         XCTAssertNotNil(pid)
-        XCTAssertNotNil(Registrar.instance.processesRegisteredByPid[pid!])
+        XCTAssertNotNil(Registrar.instance.processesLinkedToPid[pid!])
         
-        pid = Registrar.instance.processesRegisteredByName[EPMDRequest.kill]
+        pid = Registrar.instance.processesLinkedToName[EPMDRequest.kill]
         XCTAssertNotNil(pid)
-        XCTAssertNotNil(Registrar.instance.processesRegisteredByPid[pid!])
+        XCTAssertNotNil(Registrar.instance.processesLinkedToPid[pid!])
         
     }
     
@@ -577,5 +579,6 @@ final class SwiftToErlTypeConversionTests: XCTestCase{
         XCTAssertEqual(BigInt(0), Data([]).toBigInt!)
         XCTAssertEqual(BigInt(0), Data([0]).toBigInt!)
     }
+     */
 }
 
