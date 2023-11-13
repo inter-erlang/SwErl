@@ -35,6 +35,7 @@ public typealias SwErlMessage = Any
 public typealias SwErlResponse = (SwErlPassed,Any?)
 
 public typealias SwErlClosure = (SwErlMessage,SwErlState)->(SwErlResponse,SwErlState)
+public typealias SwErlStatelessHandler = (Pid,SwErlMessage)->()
 /**
   Errors thrown within SwErl
   - Author:
@@ -291,7 +292,7 @@ struct SwErlProcess{
     ///name, self, and the second is the message
     var statelessLambda:((Pid, SwErlMessage)->Void)? = nil
     var GenStatemProcessWrappers:(SwErlClosure,SwErlClosure,SwErlClosure,SwErlClosure)? = nil
-    var EventProcessWrappers:[SwErlClosure]? = nil
+    var eventHandlers:[SwErlStatelessHandler]? = nil
     let registeredPid:Pid
     
     //
@@ -339,9 +340,10 @@ struct SwErlProcess{
     
     //EventManager initialization
     init(queueToUse:DispatchQueue = DispatchQueue.global(),
-         registrationID:Pid){
+         registrationID:Pid, eventHandlers:[SwErlStatelessHandler]){
         self.queue = queueToUse
         self.registeredPid = registrationID
+        self.eventHandlers = eventHandlers
     }
 }
 

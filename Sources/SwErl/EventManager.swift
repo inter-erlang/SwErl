@@ -1,6 +1,6 @@
 //
 //  events.swift
-//  
+//
 //
 //Copyright (c) 2023 Lee Barney
 //
@@ -32,7 +32,7 @@ import Foundation
  This enumeration has, as elements, a set of generic functions that conduct
  the communication required of all _gen_event_managers_. These functions ensure
  that the hook functions in each custom event handler are executed in the
- correct order and store updated states correctly. 
+ correct order and store updated states correctly.
  
  These functions also ensure that all event handlers added to this manager are notified
  each time the manager receives an notification of an event.
@@ -40,7 +40,7 @@ import Foundation
  These functions also ensure that each custom event manager is registered
  properly so it can be used from anywhere in the application's code base.
  */
-public enum event_manager:OTPActor_behavior{
+public enum EventManager:OTPActor_behavior{
     
     /**
      This function registers, by name, and prepares a specified event manager using a list, possibly empty, of SwErl stateful or stateless process' IDs. These processes are the handlers for the event managed by the manager. Once this function completes, the occurrance can be used. All functions applied to the occurrance will execute on the main or any other thread depending on the DispatchQueue stated. By default, the global queue will be used, but if the main() queue is passed as a parameter, the occurrance's functions will all run on the main/UI thread.
@@ -54,12 +54,13 @@ public enum event_manager:OTPActor_behavior{
      - Version:
      0.1
      */
-    static func link(queueToUse:DispatchQueue = .global(),name:String,intialHandlers:[Pid]) throws -> Pid{
+    static func link(queueToUse:DispatchQueue = .global(),name:String,intialHandlers:[SwErlStatelessHandler]) throws -> Pid{
         //register the actor by name.
         let (aSerial,aCreation) = pidCounter.next()
         let PID = Pid(id: 0,serial: aSerial,creation: aCreation)
         let queueToUse = DispatchQueue(label: Pid.to_string(PID) ,target: queueToUse)
-        try Registrar.link((event_manager.self,queueToUse,intialHandlers), name: name, PID: PID)
+        let process = SwErlProcess(queueToUse:queueToUse,registrationID: PID, eventHandlers: intialHandlers)
+        try Registrar.link(process, name: name, PID: PID)
         return PID
     }
     /**
@@ -79,12 +80,11 @@ public enum event_manager:OTPActor_behavior{
         guard let PID = Registrar.instance.processesLinkedToName[name] else{
             return//Quiely fail since the statem was not registered
         }
-        let (blahtype,_,_) = Registrar.instance.OTPActorsLinkedToPid[PID]! 
-        guard let (type,_,_) = Registrar.instance.OTPActorsLinkedToPid[PID] else{
+        guard let linkedProcess:SwErlProcess = Registrar.instance.processesLinkedToPid [PID] else{
             return//Quiely fail since the manager was not registered
         }
-        guard let manager = type as? event_manager.Type else{
-            return//Quiely fail since the manager was not registered
+        guard let _ = linkedProcess.eventHandlers else{
+            return//Quiely fail since the name is not associate with an event manager
         }
         Registrar.unlink(name)
     }
@@ -101,79 +101,48 @@ public enum event_manager:OTPActor_behavior{
      - Version:
      0.1
      */
-    static func add(to:String, handler:@Sendable @escaping (Pid,SwErlMessage)->()) throws{
-        try linkHandler(to: to){(dispQueue) in
-            try spawn(queueToUse:dispQueue, function: handler)
+    static func add(handler:@Sendable @escaping (Pid,SwErlMessage)->(), to:String){
+        guard let PID = Registrar.instance.processesLinkedToName[to] else{
+            return//silently fail. No such event manager
         }
+        guard let eventManagerProcess = Registrar.instance.processesLinkedToPid[PID] else{
+            return//silently fail. No such event manager registered
+        }
+        guard var handlers = eventManagerProcess.eventHandlers else{
+            return//silently fail. Not an event handler
+        }
+        handlers.append(handler)
     }
     
     /**
-     This function associates a stateful SwErl process with named event manager.
-     
-     If the manager name does not match a linked occurrance of an event manager, nothing needs to be unlinked and the state of the application is still valid. Therefore, no exceptions are thrown.
+     This function sends a concurrent, non-blocking message to a registered occurance of an event manager. No updates to the state machine's state are done.
      - Parameters:
-     - to: a name of a registered occurrance of a  sub-type occurrance.
-     - closure: any function or closure of type _(Pid,SwErlState,SwErlMessage)->SwErlState_. Closures of type _(Pid,SwErlState,SwErlMessage)->(SwErlResponse,SwErlState)_ can be added using this function, but the _SwErlResponse_ will be ignored when the closure is executed.
+      - name: a name of a registered occurance of an event manager occurance.
+      - message: any type of data expected by the manager's event handler functions.
      - Value: Void
      - Author:
      Lee S. Barney
      - Version:
      0.1
      */
-    static func add(to:String, initialState:SwErlState, handler:@Sendable @escaping (Pid,SwErlState,SwErlMessage)->SwErlState) throws{
-        try linkHandler(to: to){(dispQueue) in
-            try spawn(queueToUse:dispQueue, initialState: initialState, function: handler)
+    static func notify(name:String,message:SwErlMessage){
+        guard let PID = Registrar.instance.processesLinkedToName[name] else{
+            return//silently fail. No such event manager
+        }
+        notify(PID: PID,message: message)
+    }
+    static func notify(PID:Pid,message:SwErlMessage){
+        guard let eventManagerProcess = Registrar.instance.processesLinkedToPid[PID] else{
+            return//silently fail. No such event manager registered
+        }
+        guard let handlers = eventManagerProcess.eventHandlers else{
+            return//silently fail. Not an event handler
+        }
+        for handler in handlers {
+            eventManagerProcess.queue.async {
+                handler(PID,message)
+            }
         }
     }
     
-    
-    /**
-     This function sends a message to a registered occurrance of a generic state machine sub-type. Messages are used to update the state of the state machine as defined in the state machine sub-type's handleEvent function.
-     - Parameters:
-     - name: a name of a registered occurrance of a statem sub-type occurrance.
-     - message: any type of data expected by the handleEvent function of the generic state machine's sub-type.
-     - Value: Void
-     - Throws: SwErlError when the name isn't registered/linked, a Pid was not previously associated with the state machine sub-type's occurrance, the name is not linked to a sub-type of gen\_statem, or the sub-type occurrance has no state to track.
-     - Author:
-     Lee S. Barney
-     - Version:
-     0.1
-     */
-    //if there is no pid associated with that name, throw an exception
-    public static func notify(PID:Pid,message:Any)throws{
-        //if the pid hasn't been registered correctly, throw an exception.
-        //this function only works on enums with the statem behavior.
-        //if the type is anything except a statem_behavior, throw an exception.
-        guard let (_,_,handlers) = Registrar.instance.OTPActorsLinkedToPid[PID] as? (event_manager.Type,DispatchQueue,[Pid]) else{
-            throw SwErlError.notEventManager_behavior
-        }
-        //send the data to all processes in the manager's list of handlers
-        for handlerPid in handlers{
-            guard let handlerProcess = Registrar.instance.processesLinkedToPid[handlerPid] else{
-                throw SwErlError.notRegisteredByPid
-                }
-            _ = executeSwErlProcess(handlerProcess, handlerPid, message)
-        }
-    }
-}
-//working function behind the facade functions
-//this is private to this file and is never to be used from anywhere but
-//from within the two existing addHandler facade functions.
-private func linkHandler(to:String, closure:(DispatchQueue)throws -> Pid) throws{
-    //find the Pid of the event_manager occurance
-    guard let PID = Registrar.instance.processesLinkedToName[to] else{
-        throw SwErlError.invalidState
-    }
-    guard let (type,dispQueue,storedState) = Registrar.instance.OTPActorsLinkedToPid[PID] else{
-        throw SwErlError.notRegisteredByPid
-    }
-    //the event_manager's state is the list of handler Pids
-    guard var currentHandlers = storedState as? [Pid] else{
-        throw SwErlError.invalidState
-    }
-    //the closure is a facade over spawn, not the handler itself
-    let handlerPID = try closure(dispQueue)
-    currentHandlers.append(handlerPID)
-    //update the state of the event_manager by associating the occurance with the event_manager's updated Pid list
-    Registrar.instance.OTPActorsLinkedToPid[PID] = (type,dispQueue,currentHandlers)
 }

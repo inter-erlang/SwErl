@@ -224,10 +224,10 @@ public enum GenStateM:OTPActor_behavior{
     
     
     /**
-     This function sends a concurrent message to a registered occurance of a generic state machine sub-type. No updates to the state machine's state are done.
+     This function sends a concurrent, non-blocking message to a registered occurance of a generic state machine sub-type. No updates to the state machine's state are done.
      - Parameters:
-     - name: a name of a registered occurance of a statem sub-type occurance.
-     - message: any type of data expected by the handleCast function of the generic state machine's sub-type.
+      - name: a name of a registered occurance of a statem sub-type occurance.
+      - message: any type of data expected by the handleCast function of the generic state machine's sub-type.
      - Value: Void
      - Author:
      Lee S. Barney
