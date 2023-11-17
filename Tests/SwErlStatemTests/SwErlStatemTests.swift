@@ -100,7 +100,7 @@ final class SwErlStatemTests: XCTestCase {
         
 
         
-        //mocked Pids made here for other functions in the GenStatemBehavior
+        //wrappers used by GenStateM
         
         let handleCall = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
             return ((SwErlPassed.ok,nil),"")//unused in this test
@@ -134,83 +134,206 @@ final class SwErlStatemTests: XCTestCase {
         //name not registered
         XCTAssertNoThrow(GenStateM.cast(name: "bob", message: 50))
     }
-//    
-//    func testGenStatemCall() throws{
-//        
-//        //setup case
-//        enum requester_statem:statem_behavior{
-//            static func handleCall(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) -> (SwErl.SwErlResponse, SwErl.SwErlState) {
-//                
-//                return ((SwErlPassed.ok,"nothing"),current_state)
-//            }
-//            
-//            static func handleCast(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) -> SwErl.SwErlState? {
-//                let responseHelper = message as! ()->()
-//                responseHelper()
-//                return 5//return the modified state
-//            }
-//            
-//            static func initializeState(initialData: Any) throws -> Any {
-//                initialData
-//            }
-//            
-//            static func notify(PID: Pid, message: Any) {
-//                return
-//            }
-//            
-//            static func start_link(queueToUse: DispatchQueue?, name: String, initial_data: Any) throws -> Pid? {
-//                try gen_statem.start_link(name: name, actor_type: tester_statem.self, initialData: initial_data)
-//            }
-//            
-//            static func unlinked(reason: String, current_state: Any) {
-//                //do nothing
-//            }
-//        }
-//        
-//        let RequesterPID = Pid(id: 0,serial: 1,creation: 0)
-//        let queue_to_use = DispatchQueue(label: Pid.to_string(RequesterPID) ,target: DispatchQueue.global())
-//        Registrar.instance.OTPActorsLinkedToPid[RequesterPID] = (requester_statem.self as statem_behavior.Type,queue_to_use,3)
-//        Registrar.instance.processesLinkedToName["requester"] = RequesterPID
-//        
-//        //the responder is the tester_statem at the top of this file
-//        let ResponderPID = Pid(id: 0,serial: 2,creation: 0)
-//        Registrar.instance.OTPActorsLinkedToPid[ResponderPID] = (tester_statem.self as statem_behavior.Type,queue_to_use,3)
-//        Registrar.instance.processesLinkedToName["responder"] = ResponderPID
-//        
-//        
-//        let receivedExpectation = XCTestExpectation(description: "received")
-//        let respondedExpectation = XCTestExpectation(description: "responded")
-//        
-//        //Happy path
-//        let helperClosureTuple = ({
-//            ()->() in
-//            receivedExpectation.fulfill()
-//        }, {
-//            ()->() in
-//            respondedExpectation.fulfill()
-//        })
-//        try gen_statem.call(name: "responder", from: "requester", message: helperClosureTuple)
-//        
-//    }
-//    
-//    func testUnlink() throws{
-//        let PID = Pid(id: 0,serial: 1,creation: 0)
-//        let queue_to_use = DispatchQueue(label: Pid.to_string(PID) ,target: DispatchQueue.global())
-//        Registrar.instance.OTPActorsLinkedToPid[PID] = (tester_statem.self as statem_behavior.Type,queue_to_use,"hello")
-//        Registrar.instance.processesLinkedToName["some_name"] = PID
-//        
-//        //happy path
-//        XCTAssertEqual(1, Registrar.instance.processesLinkedToName.count)
-//        XCTAssertEqual(1, Registrar.instance.OTPActorsLinkedToPid.count)
-//        XCTAssertNoThrow(gen_statem.unlink(name: "some_name", reason: "testing"))
-//        XCTAssertEqual(0, Registrar.instance.processesLinkedToName.count)
-//        XCTAssertEqual(0, Registrar.instance.OTPActorsLinkedToPid.count)
-//        
-//        //nasty thoughts start here
-//        XCTAssertNoThrow(gen_statem.unlink(name: "not_linked", reason: "testing"))
-//        
-//    }
-//    
+    
+    func testGenStatemCall() throws{
+        
+        //setup case
+        enum requesterStatem:GenStatemBehavior{
+            static func notify(message: SwErl.SwErlMessage, state: SwErl.SwErlState) {
+                return//do nothing
+            }
+            
+            static func initialize(initialData: Any) throws -> SwErl.SwErlState {
+                initialData
+            }
+            
+            static func unlinked(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) {
+                return//do nothing
+            }
+            
+            static func handleCast(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) -> SwErl.SwErlState {
+                return 5
+            }
+            
+            static func handleCall(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) -> (SwErl.SwErlResponse, SwErl.SwErlState) {
+                let responseHelper = message as! ()->()
+                responseHelper()
+                return ((SwErlPassed.ok,5 + (current_state as! Int)),current_state)
+            }
+            
+            static func start_link(queueToUse: DispatchQueue?, name: String, initial_data: Any) throws -> Pid? {
+                try GenStateM.startLink(name: name, statem: requesterStatem.self, initialData: initial_data)
+            }
+        }
+        
+        //wrappers used by GenStateM
+        let handleCall = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
+            return (requesterStatem.handleCall(message: message, current_state: state))
+        }
+        let handleCast = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
+            return ((SwErlPassed.ok,nil),"")//unused in this test
+        }
+        
+        let unlinked = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
+            return ((SwErlPassed.ok,nil),"")//this is ignored
+        }
+        
+        let notify = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
+            return ((SwErlPassed.ok,nil),"")//this is ignored
+        }
+        
+        
+        let (aSerial,aCreation) = pidCounter.next()
+        let OTP_Pid = Pid(id: 0, serial: aSerial, creation: aCreation)
+        let queueToUse = DispatchQueue(label: Pid.to_string(OTP_Pid) ,target: DispatchQueue.global())
+        
+        //build and link the GenStatemBehavior
+        let OTP_Process = SwErlProcess(queueToUse:queueToUse, registrationID: OTP_Pid, OTP_Wrappers: (handleCall,handleCast,unlinked,notify))
+        try Registrar.link(OTP_Process, name: "some_name", PID: OTP_Pid)
+        Registrar.instance.processStates[OTP_Pid] = 3
+        
+        //Happy path
+        let castExpectation = XCTestExpectation(description: "cast.")
+        let (success,response) = GenStateM.call(name: "some_name", message: {
+            castExpectation.fulfill()
+        })
+        XCTAssertEqual(8, (response as! Int))
+        XCTAssertEqual(success, SwErlPassed.ok)
+    }
+    
+    func testUnlink() throws{
+        //setup case
+        enum requesterStatem:GenStatemBehavior{
+            static func notify(message: SwErl.SwErlMessage, state: SwErl.SwErlState) {
+                return
+            }
+            
+            static func initialize(initialData: Any) throws -> SwErl.SwErlState {
+                initialData
+            }
+            
+            static func unlinked(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) {
+                let responseHelper = message as! ()->()
+                responseHelper()
+                return
+            }
+            
+            static func handleCast(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) -> SwErl.SwErlState {
+                return 5
+            }
+            
+            static func handleCall(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) -> (SwErl.SwErlResponse, SwErl.SwErlState) {
+                return ((SwErlPassed.ok,5),5)
+            }
+            
+            static func start_link(queueToUse: DispatchQueue?, name: String, initial_data: Any) throws -> Pid? {
+                try GenStateM.startLink(name: name, statem: requesterStatem.self, initialData: initial_data)
+            }
+        }
+        
+        //wrappers used by GenStateM
+        let handleCall = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
+            return (requesterStatem.handleCall(message: message, current_state: state))
+        }
+        let handleCast = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
+            return ((SwErlPassed.ok,nil),"")//unused in this test
+        }
+        
+        let unlinked = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
+            return ((SwErlPassed.ok,nil),"")//this is ignored
+        }
+        
+        let notify = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
+            return ((SwErlPassed.ok,nil),"")//this is ignored
+        }
+        
+        
+        let (aSerial,aCreation) = pidCounter.next()
+        let OTP_Pid = Pid(id: 0, serial: aSerial, creation: aCreation)
+        let queueToUse = DispatchQueue(label: Pid.to_string(OTP_Pid) ,target: DispatchQueue.global())
+        
+        //build and link the GenStatemBehavior
+        let OTP_Process = SwErlProcess(queueToUse:queueToUse, registrationID: OTP_Pid, OTP_Wrappers: (handleCall,handleCast,unlinked,notify))
+        try Registrar.link(OTP_Process, name: "some_name", PID: OTP_Pid)
+        Registrar.instance.processStates[OTP_Pid] = 3
+        
+        //Happy path
+        let castExpectation = XCTestExpectation(description: "unlink.")
+        let (passed,response) = GenStateM.unlink(name: "some_name", message: {
+            castExpectation.fulfill()
+        })
+        //make sure the code functions even though these values have no real meaning
+        XCTAssertEqual(SwErlPassed.ok, passed)
+        XCTAssertNil(response)
+        //making sure the registrar was updated correctly
+        XCTAssertNil(Registrar.instance.processesLinkedToName["some_name"])
+        XCTAssertNil(Registrar.instance.processesLinkedToPid[OTP_Pid])
+        
+    }
+    
+    func testNotify() throws{
+        //setup case
+        enum requesterStatem:GenStatemBehavior{
+            static func notify(message: SwErl.SwErlMessage, state: SwErl.SwErlState) {
+                let responseHelper = message as! ()->()
+                responseHelper()
+                return
+            }
+            
+            static func initialize(initialData: Any) throws -> SwErl.SwErlState {
+                initialData
+            }
+            
+            static func unlinked(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) {
+                return
+            }
+            
+            static func handleCast(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) -> SwErl.SwErlState {
+                return 5
+            }
+            
+            static func handleCall(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) -> (SwErl.SwErlResponse, SwErl.SwErlState) {
+                return ((SwErlPassed.ok,5),5)
+            }
+            
+            static func start_link(queueToUse: DispatchQueue?, name: String, initial_data: Any) throws -> Pid? {
+                try GenStateM.startLink(name: name, statem: requesterStatem.self, initialData: initial_data)
+            }
+        }
+        
+        //wrappers used by GenStateM
+        let handleCall = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
+            return (requesterStatem.handleCall(message: message, current_state: state))
+        }
+        let handleCast = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
+            return ((SwErlPassed.ok,nil),"")//unused in this test
+        }
+        
+        let unlinked = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
+            return ((SwErlPassed.ok,nil),"")//this is ignored
+        }
+        
+        let notify = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
+            return ((SwErlPassed.ok,nil),"")//this is ignored
+        }
+        
+        
+        let (aSerial,aCreation) = pidCounter.next()
+        let OTP_Pid = Pid(id: 0, serial: aSerial, creation: aCreation)
+        let queueToUse = DispatchQueue(label: Pid.to_string(OTP_Pid) ,target: DispatchQueue.global())
+        
+        //build and link the GenStatemBehavior
+        let OTP_Process = SwErlProcess(queueToUse:queueToUse, registrationID: OTP_Pid, OTP_Wrappers: (handleCall,handleCast,unlinked,notify))
+        try Registrar.link(OTP_Process, name: "some_name", PID: OTP_Pid)
+        Registrar.instance.processStates[OTP_Pid] = 3
+        
+        //Happy path
+        let castExpectation = XCTestExpectation(description: "unlink.")
+        GenStateM.notify(name: "some_name", message: {
+            castExpectation.fulfill()
+        })
+    }
+    
     func testStartlinkPerformance() throws {
         enum SpeedStatem:GenStatemBehavior{
             static func notify(message: SwErl.SwErlMessage, state: SwErl.SwErlState) {
@@ -312,132 +435,49 @@ final class SwErlStatemTests: XCTestCase {
         print("statem linking took \(linkTime/count) attoseconds per link")
         print("!!!!!!!!!!!!!!!!!!!")
     }
-//    /*
-//    func testCallPerformance() throws{
-//        //setup case
-//        enum requester_statem:statem_behavior{
-//            static func handleCall(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) -> (SwErl.SwErlResponse, SwErl.SwErlState) {
-//                
-//                return ((SwErlPassed.ok,"nothing"),current_state)
-//            }
-//            
-//            static func handleCast(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) -> SwErl.SwErlState? {
-//                let responseHelper = message as! ()->()
-//                responseHelper()
-//                return 5//return the modified state
-//            }
-//            
-//            static func initializeState(initialData: Any) throws -> Any {
-//                initialData
-//            }
-//            
-//            static func notify(PID: Pid, message: Any) {
-//                return
-//            }
-//            
-//            static func start_link(queueToUse: DispatchQueue?, name: String, initial_data: Any) throws -> Pid? {
-//                try gen_statem.start_link(name: name, actor_type: tester_statem.self, initialData: initial_data)
-//            }
-//            
-//            static func unlinked(reason: String, current_state: Any) {
-//                //do nothing
-//            }
-//        }
-//        
-//        print("\n\n\n!!!!!!!!!!!!!!!!!!! \ntesting call speed")
-//        let RequesterPID = Pid(id: 0,serial: 1,creation: 0)
-//        let queue_to_use = DispatchQueue(label: Pid.to_string(RequesterPID) ,target: DispatchQueue.global())
-//        Registrar.instance.OTPActorsLinkedToPid[RequesterPID] = (requester_statem.self as statem_behavior.Type,queue_to_use,3)
-//        Registrar.instance.processesLinkedToName["requester"] = RequesterPID
-//        
-//        //the responder is the tester_statem at the top of this file
-//        let ResponderPID = Pid(id: 0,serial: 2,creation: 0)
-//        Registrar.instance.OTPActorsLinkedToPid[ResponderPID] = (tester_statem.self as statem_behavior.Type,queue_to_use,3)
-//        Registrar.instance.processesLinkedToName["responder"] = ResponderPID
-//        
-//        let count:Int64 = 10
-//        var expectations:[XCTestExpectation] = []
-//        let timer = ContinuousClock()
-//        var callingTime:Int64 = 0
-//        for id in 0..<count{
-//            let aReceivedExpectation = XCTestExpectation(description: "received \(id)")
-//            let aRespondedExpectation = XCTestExpectation(description: "responded \(id)")
-//            expectations.append(aReceivedExpectation)
-//            expectations.append(aRespondedExpectation)
-//            //Happy path
-//            let helperClosureTuple = ({
-//                ()->() in
-//                aReceivedExpectation.fulfill()
-//            }, {
-//                ()->() in
-//                aRespondedExpectation.fulfill()
-//            })
-//            let time = try timer.measure{
-//                try gen_statem.call(name: "responder", from: "requester", message: helperClosureTuple)
-//            }
-//            callingTime = callingTime + time.components.attoseconds
-//        }
-//        
-//        wait(for: expectations, timeout: 30.0)
-//        print("sending message via cast to statem took \(callingTime/count) attoseconds per call")
-//        print("!!!!!!!!!!!!!!!!!!!")
-//        
-//        
-//    }
-//    
-//    
-//    func testCastPerformance() throws{
-//        enum Speed_statem:statem_behavior{
-//            
-//            static func start_link(queueToUse: DispatchQueue?, name: String, initial_data: Any) throws -> Pid? {
-//                try gen_statem.start_link(name: name, actor_type: Speed_statem.self, initialData: initial_data)
-//            }
-//            
-//            static func handleCast(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) -> SwErl.SwErlState? {
-//                guard let expectation = message as? XCTestExpectation else {
-//                    print("couldn't cast correctly")
-//                    return current_state
-//                }
-//                expectation.fulfill()
-//                return current_state
-//            }
-//            
-//            static func handleCall(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) -> (SwErl.SwErlResponse, SwErl.SwErlState) {
-//                ((SwErlPassed.ok,3),3)
-//            }
-//            
-//            static func notify(PID: Pid, message: Any) {
-//                
-//            }
-//            
-//            static func initializeState(initialData: Any) throws -> Any {
-//                initialData
-//            }
-//            
-//            static func unlinked(reason: String, current_state: Any) {
-//                
-//            }
-//        }
-//        print("\n\n\n!!!!!!!!!!!!!!!!!!! \ntesting cast speed")
-//        let timer = ContinuousClock()
-//        let count:Int64 = 10
-//        let _ = try Speed_statem.start_link(queueToUse: .global(), name: "caster", initial_data: "")
-//        var castingTime:Int64 = 0
-//        var expectations:[XCTestExpectation] = []
-//        let castingGroup = DispatchGroup()
-//        for count in 0..<1000{
-//            let anExpection = XCTestExpectation(description: "\(count)")
-//            expectations.append(anExpection)
-//            let time = try timer.measure{
-//                _ = try gen_statem.cast(name: "caster", message: anExpection)
-//            }
-//            castingTime = castingTime + time.components.attoseconds
-//        }
-//        wait(for: expectations, timeout: 30.0)
-//        castingGroup.wait()
-//        print("sending message via cast to statem took \(castingTime/count) attoseconds per cast")
-//        print("!!!!!!!!!!!!!!!!!!!")
-//    }
-//     */
+    func testCallPerformance() throws {
+        enum SpeedStatem:GenStatemBehavior{
+            static func notify(message: SwErl.SwErlMessage, state: SwErl.SwErlState) {
+                //do nothing
+            }
+            
+            static func handleCast(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) -> SwErl.SwErlState {
+                return 5
+            }
+            
+            static func initialize(initialData: Any) throws -> SwErl.SwErlState {
+                initialData
+            }
+            
+            static func start_link(queueToUse: DispatchQueue?, name: String, initial_data: Any) throws -> Pid? {
+                try GenStateM.startLink(name: name, statem: SpeedStatem.self, initialData: initial_data)
+            }
+            
+            static func handleCall(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) -> (SwErl.SwErlResponse, SwErl.SwErlState) {
+                return ((SwErlPassed.ok,Double.random(in: 0.0...1.0)),current_state)
+            }
+            
+            static func unlinked(message reason: SwErlMessage, current_state: SwErlState) {
+                
+            }
+        }
+        
+        print("\n\n\n!!!!!!!!!!!!!!!!!!! \nsize of registered statem_behavior  instances not including state data size: \(MemoryLayout<SpeedStatem>.size + MemoryLayout<DispatchQueue>.size) bytes")
+        print("!!!!!!!!!!!!!!!!!!!")
+        print("\n\n\n!!!!!!!!!!!!!!!!!!! \ntesting call speed")
+        _ = try SpeedStatem.start_link(queueToUse: nil, name: "statemSpeed", initial_data: ("Are you there?",3))
+        
+        let timer = ContinuousClock()
+        let count:UInt64 = 1000000
+        var linkTime:UInt64 = 0
+        for i in (0..<count){
+            let time = timer.measure{
+                let _ = GenStateM.call(name: "statemSpeed", message: i)
+            }
+            linkTime = linkTime + UInt64(time.components.attoseconds)
+        }
+        print("statem linking took \(linkTime/count) attoseconds per link")
+        print("!!!!!!!!!!!!!!!!!!!")
+    }
 
 }
