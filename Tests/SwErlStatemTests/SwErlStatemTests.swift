@@ -12,7 +12,6 @@ final class SwErlStatemTests: XCTestCase {
 
     override func setUp(){
         // Clear the Registrar and reset the pidCounter
-        // Set up any synchronous per-test state here.
         Registrar.instance.processesLinkedToName = [:]
         Registrar.instance.processesLinkedToPid = [:]
         pidCounter = ProcessIDCounter()
@@ -83,7 +82,6 @@ final class SwErlStatemTests: XCTestCase {
      }
     
     override func tearDown() {
-        print("tearing down")
         // Clear the Registrar and reset the pidCounter
         Registrar.instance.processesLinkedToName = [:]
         Registrar.instance.processesLinkedToPid = [:]

@@ -30,7 +30,7 @@ import Foundation
 
 /**
  This enumeration has, as elements, a set of generic functions that conduct
- the communication required of all _gen_event_managers_. These functions ensure
+ the communication required of all _EventManager_s. These functions ensure
  that the hook functions in each custom event handler are executed in the
  correct order and store updated states correctly.
  
@@ -70,13 +70,14 @@ public enum EventManager:OTPActor_behavior{
      If the name does not match a linked occurrance of an event manager, nothing needs to be unlinked and the state of the application is still valid. Therefore, no exceptions are thrown.
      - Parameters:
      - name: a name of a registered occurrance of a statem sub-type occurrance.
-     - Value: Void
+     - Value: void
      - Author:
      Lee S. Barney
      - Version:
      0.1
      */
     static func unlink(name:String){
+        
         guard let PID = Registrar.instance.processesLinkedToName[name] else{
             return//Quiely fail since the statem was not registered
         }
@@ -105,13 +106,15 @@ public enum EventManager:OTPActor_behavior{
         guard let PID = Registrar.instance.processesLinkedToName[to] else{
             return//silently fail. No such event manager
         }
-        guard let eventManagerProcess = Registrar.instance.processesLinkedToPid[PID] else{
+        guard var eventManagerProcess = Registrar.instance.processesLinkedToPid[PID] else{
             return//silently fail. No such event manager registered
         }
         guard var handlers = eventManagerProcess.eventHandlers else{
             return//silently fail. Not an event handler
         }
         handlers.append(handler)
+        eventManagerProcess.eventHandlers = handlers
+        Registrar.instance.processesLinkedToPid[PID] = eventManagerProcess
     }
     
     /**
