@@ -48,9 +48,9 @@ public enum GenServer {
     static func cast(_ name: String, _ message: Any) throws {
         
     }
-    static func cast(_ id: Pid, _ message: Any) throws {
-        
-    }
+//    static func cast(_ id: Pid, _ message: Any) throws {
+//        
+//    }
     
 //    static func call(name: String, message: Any) throws {
 //
