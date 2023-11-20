@@ -15,7 +15,7 @@ import Foundation
 final class Stop : XCTestCase {
     override func setUp() {
         resetRegistryAndPIDCounter()
-        try! GenServer.startLink("server", SimpleCastServer.self, nil)
+        try! GenServer.startLink("server", SimpleCastServer.self, 10)
     }
     
     override func tearDown() {
@@ -25,13 +25,9 @@ final class Stop : XCTestCase {
     //end the process with an empty associated dispatch queue
     func testEmptyQueue() {
         GenServer.stop("server", "shutdown")
+        Thread.sleep(forTimeInterval: 1)
         XCTAssert(Registrar.instance.OTPActorsLinkedToPid.isEmpty , "server ref not removed from pid:type dictionary")
         XCTAssert(Registrar.instance.processesLinkedToName.isEmpty, "server ref not removed from name:pid dictionary")
-    }
-    
-    
-    func testError_nameAlreadyRegistered() {
-        
     }
 }
 
@@ -47,29 +43,31 @@ final class FilledQueueStop: XCTestCase {
     override func setUp() {
         resetRegistryAndPIDCounter()
         noRun.isInverted = true
-        try! GenServer.startLink("queue server", StopWithQueueSever.self, noRun)
+        try! GenServer.startLink("queue server", expectationServer.self, noRun)
     }
     override func tearDown() {
         resetRegistryAndPIDCounter()
     }
     
     func testOccupiedQueueCasts() {
-        try! GenServer.cast("queue server", "delay")
-        GenServer.stop("queue server", "shutdown")
-        try! GenServer.cast("queue server", "fulfill") //error not expected here
+        // make sure each cast takes place in order
+        let Q = DispatchQueue(label: "temp q to ensure things are added in order")
         
-        wait(for: [noRun], timeout: 3) //inverted expectation
+        Q.sync { try! GenServer.cast("queue server", "delay") }
+        Q.sync { GenServer.stop("queue server", "shutdown") }
+//        Thread.sleep(forTimeInterval: 0.1)
+        Q.sync { try! GenServer.cast("queue server", "fulfill") }//error not expected here
+        wait(for: [noRun], timeout: 4) //inverted expectation
     }
-    
 //    func testOccupiedQueueCalls() {
 //
 //    }
 }
 
 final class AlreadyRegistered: XCTestCase {
-    override func setUp() {
+    override func setUpWithError() throws {
         resetRegistryAndPIDCounter()
-        try! GenServer.startLink("already registered", SimpleCastServer.self, nil)
+        try GenServer.startLink("already registered", SimpleCastServer.self, nil)
     }
     
     override func tearDown() {

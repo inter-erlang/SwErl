@@ -367,7 +367,7 @@ struct Registrar{
     // concurrent writes use .sync(flags: .barrier) or .async(flags: .barrier)
     // Each dictionary could have it's own queue, but that'd be textbook premature optimization.
     // One may hypothesize that an extra Writer-Readers queue on the state dict would see the greatest gains.
-    static let queue = DispatchQueue(label: "Regitrar Concurrent Queue", attributes: .concurrent)
+    static let queue = DispatchQueue(label: "Registrar Concurrent Queue", attributes: .concurrent)
     
     var processesLinkedToPid:[Pid:SwErlProcess] = [:]
     var processesLinkedToName:[String:Pid] = [:]
@@ -403,13 +403,24 @@ struct Registrar{
         }
     }
 
-    static func link<T:OTPActor_behavior>(callbackType: T.Type, processQueue: DispatchQueue, initState: Any?, name:String, PID:Pid) throws{
-        guard Registrar.pidLinked(PID) || Registrar.nameLinked(<#T##forName: String##String#>)  else {
+    static func link<T:OTPActor_behavior>(callbackType: T.Type, processQueue: DispatchQueue, 
+                                          initState: Any?, name:String, PID:Pid) throws{
+        guard  !Registrar.pidLinked(PID) && !Registrar.nameLinked(name)  else { //better way to invert guard expression?
             throw SwErlError.processAlreadyLinked
         }
+        //Order order tape recorder. Dicts must be built from state up, otherwise null memory can be accessed:
+        //state -> pid
+        // pid -> callback
+        // name -> pid
+        try link(callbackType: callbackType, processQueue: processQueue,
+                 initState: initState, PID: PID)
+        queue.sync(flags: .barrier) { instance.processesLinkedToName[name] = PID }
+    }
+    
+    static func link<T:OTPActor_behavior>(callbackType: T.Type, processQueue: DispatchQueue,
+                                          initState: Any?, PID:Pid) throws{
         queue.sync(flags: .barrier) { instance.processStates[PID] = initState }
         queue.sync(flags: .barrier) { instance.OTPActorsLinkedToPid[PID] = (callbackType, processQueue) }
-        queue.sync(flags: .barrier) { instance.processesLinkedToName[name] = PID }
     }
     /**
      This function is used to remove the link between a Pid and a SwErl process. The process is also removed.
@@ -457,6 +468,9 @@ struct Registrar{
         return queue.sync{instance.processesLinkedToPid[forID]}
     }
     
+    static func getOtpProcess(forID: Pid) -> (OTPActor_behavior.Type, DispatchQueue)? {
+        return queue.sync{ instance.OTPActorsLinkedToPid[forID] }
+    }
     /**
      This function provides access to a process by name.
        - Parameters:
@@ -486,7 +500,12 @@ struct Registrar{
     static func getPid(forName:String)->Pid?{
         return queue.sync{instance.processesLinkedToName[forName]}
     }
-    
+    static func getProcessState(forID: Pid) -> Any? {
+        return queue.sync{ instance.processStates[forID] }
+    }
+    static func setProcessState(forID: Pid, value: Any) {
+        return queue.sync(flags: .barrier){ instance.processStates[forID] = value }
+    }
     static func otpPidLinked(_ forID: Pid) -> Bool {
         queue.sync {
             switch instance.OTPActorsLinkedToPid[forID] {
@@ -497,6 +516,7 @@ struct Registrar{
             }
         }
     }
+    
     static func pidLinked(_ forID: Pid) -> Bool {
         queue.sync {
             switch instance.processesLinkedToPid[forID] {

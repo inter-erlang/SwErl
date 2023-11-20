@@ -32,16 +32,15 @@ final class Cast : XCTestCase {
         XCTAssertThrowsError(
             try GenServer.cast(Pid(id: 100, serial: 100, creation: 100), "any message"),
             "unregistered Pid did not error"){ (error) in
-                XCTAssertEqual(error as! SwErlError, SwErlError.notRegisteredByPid)
+                XCTAssertEqual(error as! SwErlError, SwErlError.notGenServer_behavior)
             }
-        
     }
     
     func testUnregisteredName() {
         XCTAssertThrowsError(
             try GenServer.cast("unregistered name", "any message"),
             "unregistered Name did not error"){ (error) in
-                XCTAssertEqual(error as! SwErlError, SwErlError.nameNotRegistered,
+                XCTAssertEqual(error as! SwErlError, SwErlError.notRegisteredByName,
                                "incorrect error type")
             }
     }
@@ -53,6 +52,12 @@ final class Cast : XCTestCase {
                 XCTAssertEqual(error as! SwErlError, SwErlError.notGenServer_behavior,
                                "incorrect error type")
             }
+    }
+    func testStateMutation() {
+        let azalea = try! GenServer.startLink(concurrencyServer.self, 0)
+        try! GenServer.cast(azalea, "write")
+        Thread.sleep(forTimeInterval: 1) //ensure no concurrent read+write on Registrar
+        XCTAssertEqual(1, Registrar.instance.processStates[azalea] as! Int, "cast failed to mutate state")
     }
 }
 
