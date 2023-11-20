@@ -27,6 +27,13 @@
         "identifier" : "SwErlStatemTests",
         "name" : "SwErlStatemTests"
       }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "SwErlEventManagerTests",
+        "name" : "SwErlEventManagerTests"
+      }
     }
   ],
   "version" : 1

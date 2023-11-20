@@ -92,6 +92,11 @@ final class SwErlStatemTests: XCTestCase {
     // gen_statem_tests
     //
     func testGenStatemStartLink() throws {
+        //
+        // Use a specific state machine for this test that
+        // won't conflict with the requester state machine
+        // used in the other tests.
+        //
         enum TesterStatem:GenStatemBehavior{
             
             static func handleCast(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) -> SwErl.SwErlState {
@@ -137,6 +142,7 @@ final class SwErlStatemTests: XCTestCase {
         XCTAssertNil(theProcess.statelessLambda)
         XCTAssertNil(theProcess.syncStatefulLambda)
         XCTAssertNil(theProcess.asyncStatefulLambda)
+        XCTAssertNil(theProcess.eventHandlers)
         
         let (_,_,_,_) = theProcess.GenStatemProcessWrappers!
         XCTAssertNotNil(Registrar.instance.processStates[PID])
