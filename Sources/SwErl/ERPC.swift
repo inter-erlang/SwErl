@@ -29,5 +29,16 @@ enum ERPC{
     func cast(node:String,module:String,function:String,parameters:[Any]) {
         
     }
+    func multicast(nodes:[String],module:String,function:String,parameters:[Any]){
+        
+    }
+    func call(node:String,module:String,function:String,parameters:[Any])->Any{
+        
+        return 0
+    }
+    func multicall(nodes:[String],module:String,function:String,parameters:[Any])->[Any]{
+        
+        return [0]
+    }
 }
 

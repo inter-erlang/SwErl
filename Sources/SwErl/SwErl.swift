@@ -127,10 +127,10 @@ public enum SwErlPassed{
 }
 
 /**
- This function is used to link a unique name to a stateless function or closure that is executed asynchronously. Any DispatchQueue desired for running the function or closure can be passed as the first parameter. The default is the _global_ background queue.
+ This function is used to link a unique name to a stateless function or closure that is executed asynchronously. Any DispatchQueue desired for running the function or closure can be passed as the first parameter.
    - Parameters:
-    - queueToUse: any DispatchQueue, custom or built-in.   
-    - name: a unique string used as an identifier.
+    - queueToUse: any DispatchQueue, custom or built-in. Default is _DispatchQueue.global()_
+    - name: a unique string optional used as an identifier. Default is _nil_
     - function: the function or closure to execute using the DispatchQueue
   - Value: a SwErl Pid
   - Author:
@@ -148,11 +148,12 @@ public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),name:String?
     try Registrar.link(SwErlProcess(registrationID: PID, functionality: function), name: name, PID: PID)
     return PID
 }
+
 /**
- This function is used to link a unique name to a stateful function or closure that is executed synchronously. A result is sent back to the process sending the initial message. Any DispatchQueue desired for running the function or closure can be passed as the first parameter. The default is the _global_ background queue. The state can be any valid Swift type, a tuple, a list, a dictionary, optional, closure, etc.
+ This function is used to link a unique name to a stateful function or closure that is executed synchronously. A result is sent back to the process sending the initial message. Any DispatchQueue desired for running the function or closure can be passed as the first parameter. The state can be any valid Swift type, a tuple, a list, a dictionary, optional, closure, etc.
    - Parameters:
-    - queueToUse: any DispatchQueue, custom or built-in.
-    - name: a unique string used as an identifier.
+    - queueToUse: any DispatchQueue, custom or built-in.. Default is _DispatchQueue.global()_
+    - name: a unique string optional used as an identifier. . Default is _nil_
     - function: the function or closure to execute using the DispatchQueue
   - Value: a SwErl Pid
   - Author:
@@ -173,10 +174,10 @@ public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),name:String?
     return PID
 }
 /**
- This function is used to link a unique name to a stateful function or closure that is executed asynchronously with no result being sent to the process sending the message. Any DispatchQueue desired for running the function or closure can be passed as the first parameter. The default is the _global_ background queue. The state can be any valid Swift type, a tuple, a list, a dictionary, optional, closure, etc.
+ This function is used to link a unique name to a stateful function or closure that is executed asynchronously with no result being sent to the process sending the message. Any DispatchQueue desired for running the function or closure can be passed as the first parameter. The state can be any valid Swift type, a tuple, a list, a dictionary, optional, closure, etc.
    - Parameters:
-    - queueToUse: any DispatchQueue, custom or built-in.
-    - name: a unique string used as an identifier.
+    - queueToUse: any DispatchQueue, custom or built-in. Default is _DispatchQueue.global()_
+    - name: a unique string optional used as an identifier. . Default is nil_
     - function: the function or closure to execute using the DispatchQueue
   - Value: a SwErl Pid
   - Author:
@@ -193,6 +194,44 @@ public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),name:String?
         return PID
     }
     try Registrar.link(SwErlProcess(registrationID: PID, functionality: function), name: name, PID: PID)
+    Registrar.instance.processStates[PID] = initialState
+    return PID
+}
+
+/**
+ This function is used to link a unique name to a stateless function or closure that is executed asynchronously. The function is then available to be called remotely from any SwErl compatable node. Any DispatchQueue desired for running the function or closure can be passed as the first parameter.
+   - Parameters:
+    - queueToUse: any DispatchQueue, custom or built-in. Default is _DispatchQueue.global()_
+    - name: a unique string used as an identifier.
+    - function: the function or closure to execute using the DispatchQueue
+  - Value: a SwErl Pid
+  - Author:
+    Lee S. Barney
+  - Version:
+    0.1
+ */
+public func spawnGlobally(queueToUse:DispatchQueue = DispatchQueue.global(),name:String,function:@escaping @Sendable(Pid,SwErlMessage)->Void)throws -> Pid {
+    let (aSerial,aCreation) = pidCounter.next()
+    let PID = Pid(id: 0,serial: aSerial,creation: aCreation)
+    try EPMDRegistrar.link(SwErlProcess(registrationID: PID, functionality: function), name: name, PID: PID)
+    return PID
+}
+/**
+ This function is used to link a unique name to a stateful function or closure that is executed synchronously. The function is then available to be called remotely from any SwErl compatable node. A result is sent back to the process sending the initial message. Any DispatchQueue desired for running the function or closure can be passed as the first parameter. The state can be any valid Swift type, a tuple, a list, a dictionary, optional, closure, etc.
+   - Parameters:
+    - queueToUse: any DispatchQueue, custom or built-in.. Default is _DispatchQueue.global()_
+    - name: a unique string used as an identifier.
+    - function: the function or closure to execute using the DispatchQueue
+  - Value: a SwErl Pid
+  - Author:
+    Lee S. Barney
+  - Version:
+    0.1
+ */
+public func spawnGlobally(queueToUse:DispatchQueue = DispatchQueue.global(),name:String,initialState:SwErlState,function:@escaping @Sendable(Pid,SwErlState,SwErlMessage) -> (SwErlResponse,SwErlState))throws -> Pid {
+    let (aSerial,aCreation) = pidCounter.next()
+    let PID = Pid(id: 0, serial: aSerial, creation: aCreation)
+    try EPMDRegistrar.link(SwErlProcess(registrationID: PID, functionality: function), name: name, PID: PID)
     Registrar.instance.processStates[PID] = initialState
     return PID
 }

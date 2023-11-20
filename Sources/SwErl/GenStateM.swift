@@ -143,6 +143,52 @@ public enum GenStateM:OTPActor_behavior{
         try Registrar.link(statemProcess, name: name, PID: OTP_Pid)
         return OTP_Pid
     }
+    
+    /**
+     This function registers, by name, and prepares an occurance of a specified sub-type of a generic state machine using the specified data. Once this function completes, the sub-type occurance can be used. All functions applied to the occurance will execute on the main or any other thread depending on the DispatchQueue stated. By default, the global queue will be used, but if the main() queue is passed as a parameter, the sub-type's functions will all run on the main/UI thread.
+     - Parameters:
+      - queueToUse: the desired queue for the processes should use. Default:main()
+      - name: a name to link to an occurance of the statem sub-type.
+      - statem: the sub-type of statem being linked to.
+      - initialData: any desired data used to initialize the statem sub-type occurance's state. This data is passsed to the statem sub-type's initialize function.
+     - Value: a Pid that uniquely identifies the occurance of the sub-type of gen\_statem the name is linked to
+     - Author:
+     Lee S. Barney
+     - Version:
+     0.1
+     */
+    static func startLinkGlobally<T:GenStatemBehavior>(queueToUse:DispatchQueue = DispatchQueue.global(),name:String,statem:T.Type,initialData:Any) throws -> Pid{
+        
+        //generate the pid prior to the pids for the behavior closures
+        let (aSerial,aCreation) = pidCounter.next()
+        let OTP_Pid = Pid(id: 0, serial: aSerial, creation: aCreation)
+        
+        //the state machine will consume all requests serially in the order they were received
+        let serialQueue = DispatchQueue(label: Pid.to_string(OTP_Pid) ,target: queueToUse)
+        
+        Registrar.instance.processStates[OTP_Pid] = try statem.initialize(initialData: initialData)//store the state under the process PID
+        
+        let handleCall = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
+            return statem.handleCall(message: message, current_state: state)
+        }
+        let handleCast = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
+            return ((SwErlPassed.ok,nil),statem.handleCast(message: message, current_state: state))
+        }
+        
+        let unlinked = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
+            statem.unlinked(message: message, current_state: state)
+            return ((SwErlPassed.ok,nil),"")//this is ignored
+        }
+        
+        let notify = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
+            statem.notify(message: message, state: state)
+            return ((SwErlPassed.ok,nil),"")//this is ignored
+        }
+        
+        let statemProcess = SwErlProcess(queueToUse:serialQueue, registrationID: OTP_Pid, OTP_Wrappers: (handleCall,handleCast,unlinked,notify))
+        try EPMDRegistrar.link(statemProcess, name: name, PID: OTP_Pid)
+        return OTP_Pid
+    }
     /**
      This function unlinks the information of an occurance of a generic state machine's sub-type. When the state machine is unlinked, all data memory for the state machine is freed. Other occurances of the sub-type registered under other names are unaffected.
      
