@@ -352,3 +352,74 @@ final class SwErlStatemTests: XCTestCase {
     }
 
 }
+
+
+final class ConcurrencyTests: XCTestCase {
+    
+    //This StateM expects to get an XCT expectation as state. when casted, called, or  notified it
+    // fulfills the expectation.
+    
+    //This fails hard, though. It downright segfaults which is annoying to catch to say the least.
+    enum expectationStateM:GenStatemBehavior{
+        
+        static func handleCast(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) -> SwErl.SwErlState {
+            if let exp = current_state as? XCTestExpectation {
+                exp.fulfill()
+            }
+            return current_state
+        }
+        
+        static func notify(message: SwErl.SwErlMessage, state: SwErl.SwErlState) {
+            //do nothing
+        }
+        
+        
+        static func start_link(queueToUse: DispatchQueue?, name: String, initial_data: Any) throws -> Pid? {
+            try GenStateM.startLink(name: name, statem: expectationStateM.self, initialData: initial_data)
+        }
+        
+        static func unlinked(message: SwErlMessage, current_state: SwErlState) {
+            //do nothing
+        }
+        
+        static func initialize(initialData: Any) throws -> SwErl.SwErlState {
+            initialData
+        }
+        
+        static func handleCall(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) -> (SwErl.SwErlResponse, SwErl.SwErlState) {
+            if let exp = current_state as? XCTestExpectation {
+                exp.fulfill()
+            }
+            return ((SwErlPassed.ok,"ok"), current_state)
+        }
+    
+    }
+    
+    override func setUp() {
+        Registrar.instance.processesLinkedToName = [:]
+        Registrar.instance.processesLinkedToPid = [:]
+        Registrar.instance.processStates = [:]
+        pidCounter = ProcessIDCounter()
+    }
+    override func tearDown() {
+        Registrar.instance.processesLinkedToName = [:]
+        Registrar.instance.processesLinkedToPid = [:]
+        Registrar.instance.processStates = [:]
+        pidCounter = ProcessIDCounter()
+    }
+    
+    @discardableResult
+    func addOneStateM(_ name: String, _ expectation: XCTestExpectation) -> Pid {
+        try! GenStateM.startLink(name: name, statem: expectationStateM.self, initialData: expectation)
+    }
+    
+    func testConcurrentCreation() {
+            for i in 1...1000000 {
+                DispatchQueue.global().async {
+                self.addOneStateM("statem_\(i)", XCTestExpectation(description: "unused_\(i)"))
+            }
+        }
+        Thread.sleep(forTimeInterval: 10)
+        print(Registrar.instance.processesLinkedToName)
+    }
+}

@@ -36,6 +36,9 @@ let package = Package(
             name: "SwErlStatemTests",
             dependencies: ["SwErl"]),
         .testTarget(
+            name: "GenServerAPITests",
+            dependencies: ["SwErl"]),
+        .testTarget(
             name: "SwErlEventManagerTests",
             dependencies: ["SwErl"]),
         .testTarget(

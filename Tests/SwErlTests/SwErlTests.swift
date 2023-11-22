@@ -309,6 +309,10 @@ final class SwErlTests: XCTestCase {
         XCTAssertNil(Registrar.getProcess(forID: second))
         XCTAssertEqual(2, Registrar.getAllPIDs().count)
         
+        
+        XCTAssertTrue(Registrar.pidLinked(third), "pidLinked not reporting true for extant pid")
+        XCTAssertFalse(Registrar.pidLinked(second), "pidLinked not reporting false for extant pid")
+
     }
     func testSequencingOfSyncStatefulProcesses()throws{
         
