@@ -141,8 +141,7 @@ public enum SwErlPassed{
     0.1
  */
 public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),name:String?=nil,function:@escaping @Sendable(Pid,SwErlMessage)->Void)throws -> Pid {
-    let (aSerial,aCreation) = pidCounter.next()
-    let PID = Pid(id: 0,serial: aSerial,creation: aCreation)
+    let PID = Registrar.generatePid()
     guard let name = name else{
         try Registrar.link(SwErlProcess(registrationID: PID, functionality: function), PID: PID)
         return PID
@@ -164,8 +163,7 @@ public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),name:String?
     0.1
  */
 public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),name:String?=nil,initialState:SwErlState,function:@escaping @Sendable(Pid,SwErlState,SwErlMessage) -> (SwErlResponse,SwErlState))throws -> Pid {
-    let (aSerial,aCreation) = pidCounter.next()
-    let PID = Pid(id: 0, serial: aSerial, creation: aCreation)
+    let PID = Registrar.generatePid()
     guard let name = name else{
         try Registrar.link(SwErlProcess(registrationID: PID,functionality: function), PID: PID)
         Registrar.instance.processStates[PID] = initialState
@@ -188,8 +186,7 @@ public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),name:String?
     0.1
  */
 public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),name:String?=nil,initialState:SwErlState,function:@escaping @Sendable(Pid,SwErlState,SwErlMessage)->SwErlState)throws -> Pid {
-    let (aSerial,aCreation) = pidCounter.next()
-    let PID = Pid(id: 0, serial: aSerial, creation: aCreation)
+    let PID = Registrar.generatePid()
     guard let name = name else{
         try Registrar.link(SwErlProcess(registrationID: PID, functionality: function), PID: PID)
         Registrar.instance.processStates[PID] = initialState
@@ -213,8 +210,7 @@ public func spawn(queueToUse:DispatchQueue = DispatchQueue.global(),name:String?
     0.1
  */
 public func spawnGlobally(queueToUse:DispatchQueue = DispatchQueue.global(),name:String,function:@escaping @Sendable(Pid,SwErlMessage)->Void)throws -> Pid {
-    let (aSerial,aCreation) = pidCounter.next()
-    let PID = Pid(id: 0,serial: aSerial,creation: aCreation)
+    let PID = Registrar.generatePid()
     try EPMDRegistrar.link(SwErlProcess(registrationID: PID, functionality: function), name: name, PID: PID)
     return PID
 }
@@ -231,8 +227,7 @@ public func spawnGlobally(queueToUse:DispatchQueue = DispatchQueue.global(),name
     0.1
  */
 public func spawnGlobally(queueToUse:DispatchQueue = DispatchQueue.global(),name:String,initialState:SwErlState,function:@escaping @Sendable(Pid,SwErlState,SwErlMessage) -> (SwErlResponse,SwErlState))throws -> Pid {
-    let (aSerial,aCreation) = pidCounter.next()
-    let PID = Pid(id: 0, serial: aSerial, creation: aCreation)
+    let PID = Registrar.generatePid()
     try EPMDRegistrar.link(SwErlProcess(registrationID: PID, functionality: function), name: name, PID: PID)
     Registrar.instance.processStates[PID] = initialState
     return PID
@@ -414,53 +409,52 @@ struct Registrar{
     var OTPActorsLinkedToPid: [Pid : (OTPActor_behavior.Type, DispatchQueue)] = [:]
     var processStates:[Pid:Any] = [:]
     
-    /*
-     The Registrar's link functions should only be used from within the spawn function. They should not be called directly.
-     */
-    static func link(_ toBeAdded:SwErlProcess, PID:Pid) throws{
-        let process = queue.sync {
-            Registrar.getProcess(forID: PID)
-        }
-        guard process == nil else{
-            throw SwErlError.processAlreadyLinked
-        }
-        queue.sync(flags: .barrier) { // can be queue.async(flags: .barrier)
-            instance.processesLinkedToPid[PID] = toBeAdded
+    static func generatePid()->Pid{
+        queue.sync(flags: .barrier){
+            let (aSerial,aCreation) = pidCounter.next()
+            return Pid(id: 0, serial: aSerial, creation: aCreation)
         }
     }
     
-    static func link(_ toBeAdded:SwErlProcess, name:String, PID:Pid) throws{
-        let process = queue.sync {
-            Registrar.getProcess(forID: PID)
-        }
-        guard process == nil else{
-            throw SwErlError.processAlreadyLinked
-        }
-        try Registrar.link(toBeAdded, PID: PID)
-        queue.sync(flags: .barrier) {
-            instance.processesLinkedToName[name] = PID
+    static func link(_ toBeAdded:SwErlProcess, initState:Any = "SwErlNone", name:String = "SwErlNone", PID:Pid) throws{
+        try queue.sync(flags: .barrier) {
+            if instance.processesLinkedToPid[PID] != nil{
+                throw SwErlError.processAlreadyLinked
+            }
+            instance.processesLinkedToPid[PID] = toBeAdded
+                
+            if name != "SwErlNone"{
+                instance.processesLinkedToName[name] = PID
+                
+            }
+           guard let stateString = initState as? String else{
+                instance.processStates[PID] = initState
+               return
+            }
+            if stateString != "SwErlNone"{
+                instance.processStates[PID] = initState
+            }
         }
     }
 
     static func link<T:OTPActor_behavior>(callbackType: T.Type, processQueue: DispatchQueue, 
-                                          initState: Any?, name:String, PID:Pid) throws{
+                                          initState: Any?, name:String = "SwErlNone", PID:Pid) throws{
         guard  !Registrar.pidLinked(PID) && !Registrar.nameLinked(name)  else { //better way to invert guard expression?
             throw SwErlError.processAlreadyLinked
         }
-        //Order order tape recorder. Dicts must be built from state up, otherwise null memory can be accessed:
+        //Dicts must be built from state up, otherwise null memory can be accessed:
         //state -> pid
         // pid -> callback
         // name -> pid
-        try link(callbackType: callbackType, processQueue: processQueue,
-                 initState: initState, PID: PID)
-        queue.sync(flags: .barrier) { instance.processesLinkedToName[name] = PID }
+        queue.sync(flags: .barrier) {
+            instance.processStates[PID] = initState
+            instance.OTPActorsLinkedToPid[PID] = (callbackType, processQueue)
+            if name != "SwErlNone"{
+                instance.processesLinkedToName[name] = PID
+            }
+        }
     }
     
-    static func link<T:OTPActor_behavior>(callbackType: T.Type, processQueue: DispatchQueue,
-                                          initState: Any?, PID:Pid) throws{
-        queue.sync(flags: .barrier) { instance.processStates[PID] = initState }
-        queue.sync(flags: .barrier) { instance.OTPActorsLinkedToPid[PID] = (callbackType, processQueue) }
-    }
     /**
      This function is used to remove the link between a Pid and a SwErl process. The process is also removed.
        - Parameters:
@@ -504,7 +498,9 @@ struct Registrar{
         0.1
      */
     static func getProcess(forID:Pid)->SwErlProcess?{
-        return queue.sync{instance.processesLinkedToPid[forID]}
+        return queue.sync{
+            instance.processesLinkedToPid[forID]
+        }
     }
     
     static func getOtpProcess(forID: Pid) -> (OTPActor_behavior.Type, DispatchQueue)? {

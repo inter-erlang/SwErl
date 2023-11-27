@@ -29,9 +29,8 @@ public enum GenServer {
     static func startLink<T: GenServerBehavior>(
         queueEndpoint: DispatchQueue = DispatchQueue.global(),
         _ name: String, _ type: T.Type, _ initialState: Any?) throws -> String {
-            let (aSerial, aCreation) = pidCounter.next()
-            let pid = Pid(id: 0, serial: aSerial, creation: aCreation)
-            let state = queueEndpoint.sync { type.initializeData(initialState) }
+            let pid = Registrar.generatePid()
+            let state = type.initializeData(initialState)
             try Registrar.link(callbackType: type, processQueue: queueEndpoint, initState: state, name: name, PID: pid)
             return name
     }
@@ -40,9 +39,8 @@ public enum GenServer {
     static func startLink<T: GenServerBehavior>(
         queueEndpoint: DispatchQueue = DispatchQueue.global(),
         _ type: T.Type, _ initialState: Any?) throws -> Pid {
-            let (aSerial, aCreation) = pidCounter.next()
-            let pid = Pid(id: 0, serial: aSerial, creation: aCreation)
-            let state = queueEndpoint.sync { type.initializeData(initialState) }
+            let pid = Registrar.generatePid()
+            let state = type.initializeData(initialState)
             try Registrar.link(callbackType: type, processQueue: queueEndpoint, initState: state, PID: pid)
             return pid
     }
@@ -95,8 +93,13 @@ public enum GenServer {
             guard let state = Registrar.getProcessState(forID: id) else {
                 return
             }
+            //if handle cast returns nil, return early
+            guard let updatedState =  genServer.handleCast(request: message, data: state) else{
+                return
+            }
+            //if handle state returns something other than nil, set the new state to be the current state.
             Registrar.setProcessState(forID: id, value:
-                                        genServer.handleCast(request: message, data: state))
+                                       updatedState)
         }
 
     }
@@ -117,7 +120,7 @@ public enum GenServer {
         guard let _ = Registrar.getProcessState(forID: id) else {
             throw SwErlError.invalidState //Notable Race condition here (though also an unreachable
             // state): this state check happens, the OTP process manipulates state to nil,
-            // the genserver is casted to with a nil state.
+            // the genserver is cast to a nil state.
             // Left as is for now because this error, being caused internally, should error
             // within the context of the process and result in erlang-style error handling.
             // Bubbling up through the links until something is configured to trap exits.

@@ -53,7 +53,7 @@ public protocol GenStatemBehavior:OTPActor_behavior{
      - Version:
      0.1
      */
-    static func initialize(initialData:Any)throws ->SwErlState
+    static func initialize(initialData:Any) ->SwErlState
     
     /**
      This hook function is used to react to a request to unlink request. At this point, when this function executes, the machine sub-type's occurance has already been unlinked.
@@ -111,16 +111,13 @@ public enum GenStateM:OTPActor_behavior{
      - Version:
      0.1
      */
-    static func startLink<T:GenStatemBehavior>(queueToUse:DispatchQueue = DispatchQueue.global(),name:String,statem:T.Type,initialData:Any) throws -> Pid{
+    @discardableResult static func startLink<T:GenStatemBehavior>(queueToUse:DispatchQueue = DispatchQueue.global(),name:String,statem:T.Type,initialData:Any) throws -> Pid{
         
         //generate the pid prior to the pids for the behavior closures
-        let (aSerial,aCreation) = pidCounter.next()
-        let OTP_Pid = Pid(id: 0, serial: aSerial, creation: aCreation)
+        let OTP_Pid = Registrar.generatePid()
         
         //the state machine will consume all requests serially in the order they were received
         let serialQueue = DispatchQueue(label: Pid.to_string(OTP_Pid) ,target: queueToUse)
-        
-        Registrar.instance.processStates[OTP_Pid] = try statem.initialize(initialData: initialData)//store the state under the process PID
         
         let handleCall = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
             return statem.handleCall(message: message, current_state: state)
@@ -140,7 +137,9 @@ public enum GenStateM:OTPActor_behavior{
         }
         
         let statemProcess = SwErlProcess(queueToUse:serialQueue, registrationID: OTP_Pid, OTP_Wrappers: (handleCall,handleCast,unlinked,notify))
-        try Registrar.link(statemProcess, name: name, PID: OTP_Pid)
+       
+        let state = statem.initialize(initialData: initialData)
+        try Registrar.link(statemProcess, initState:state, name: name, PID: OTP_Pid)
         return OTP_Pid
     }
     
@@ -157,7 +156,7 @@ public enum GenStateM:OTPActor_behavior{
      - Version:
      0.1
      */
-    static func startLinkGlobally<T:GenStatemBehavior>(queueToUse:DispatchQueue = DispatchQueue.global(),name:String,statem:T.Type,initialData:Any) throws -> Pid{
+    @discardableResult static func startLinkGlobally<T:GenStatemBehavior>(queueToUse:DispatchQueue = DispatchQueue.global(),name:String,statem:T.Type,initialData:Any) throws -> Pid{
         
         //generate the pid prior to the pids for the behavior closures
         let (aSerial,aCreation) = pidCounter.next()
@@ -165,8 +164,6 @@ public enum GenStateM:OTPActor_behavior{
         
         //the state machine will consume all requests serially in the order they were received
         let serialQueue = DispatchQueue(label: Pid.to_string(OTP_Pid) ,target: queueToUse)
-        
-        Registrar.instance.processStates[OTP_Pid] = try statem.initialize(initialData: initialData)//store the state under the process PID
         
         let handleCall = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
             return statem.handleCall(message: message, current_state: state)
@@ -186,7 +183,9 @@ public enum GenStateM:OTPActor_behavior{
         }
         
         let statemProcess = SwErlProcess(queueToUse:serialQueue, registrationID: OTP_Pid, OTP_Wrappers: (handleCall,handleCast,unlinked,notify))
-        try EPMDRegistrar.link(statemProcess, name: name, PID: OTP_Pid)
+        let state = statem.initialize(initialData: initialData)
+        
+//        try EPMDRegistrar.link(statemProcess, initState:state, name: name, PID: OTP_Pid)
         return OTP_Pid
     }
     /**
