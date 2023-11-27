@@ -8,7 +8,7 @@
 import XCTest
 @testable import SwErl
 
-final class SwErlEventManagerSpeedAndSizeTests: XCTestCase {
+final class EventManagerSpeedAndSizeTests: XCTestCase {
 
     func testEventManagerSize() throws{
         print("\n\n\n!!!!!!!!!!!!!!!!!!! \nsize of registered state machine proces  instances not including handlers' size: \(MemoryLayout<SwErlProcess>.size + MemoryLayout<DispatchQueue>.size) bytes")

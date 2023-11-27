@@ -56,8 +56,7 @@ public enum EventManager:OTPActor_behavior{
      */
     static func link(queueToUse:DispatchQueue = .global(),name:String,intialHandlers:[SwErlStatelessHandler]) throws -> Pid{
         //register the actor by name.
-        let (aSerial,aCreation) = pidCounter.next()
-        let PID = Pid(id: 0,serial: aSerial,creation: aCreation)
+        let PID = Registrar.generatePid()
         let queueToUse = DispatchQueue(label: Pid.to_string(PID) ,target: queueToUse)
         let process = SwErlProcess(queueToUse:queueToUse,registrationID: PID, eventHandlers: intialHandlers)
         try Registrar.link(process, name: name, PID: PID)
@@ -78,43 +77,16 @@ public enum EventManager:OTPActor_behavior{
      */
     static func unlink(name:String){
         
-        guard let PID = Registrar.instance.processesLinkedToName[name] else{
+        guard let PID = Registrar.getPid(forName: name) else{
             return//Quiely fail since the statem was not registered
         }
-        guard let linkedProcess:SwErlProcess = Registrar.instance.processesLinkedToPid [PID] else{
+        guard let linkedProcess:SwErlProcess = Registrar.getProcess(forID: PID)else{
             return//Quiely fail since the manager was not registered
         }
         guard let _ = linkedProcess.eventHandlers else{
             return//Quiely fail since the name is not associate with an event manager
         }
         Registrar.unlink(name)
-    }
-    /**
-     This function associates a stateless SwErl process with named event manager.
-     
-     If the manager name does not match a linked occurrance of an event manager, nothing needs to be unlinked and the state of the application is still valid. Therefore, no exceptions are thrown.
-     - Parameters:
-     - to: a name of a registered occurrance of a  sub-type occurrance.
-     - closure: any function or closure of type _(Pid,SwErlMessage)->()_
-     - Value: Void
-     - Author:
-     Lee S. Barney
-     - Version:
-     0.1
-     */
-    static func add(handler:@Sendable @escaping (Pid,SwErlMessage)->(), to:String){
-        guard let PID = Registrar.instance.processesLinkedToName[to] else{
-            return//silently fail. No such event manager
-        }
-        guard var eventManagerProcess = Registrar.instance.processesLinkedToPid[PID] else{
-            return//silently fail. No such event manager registered
-        }
-        guard var handlers = eventManagerProcess.eventHandlers else{
-            return//silently fail. Not an event handler
-        }
-        handlers.append(handler)
-        eventManagerProcess.eventHandlers = handlers
-        Registrar.instance.processesLinkedToPid[PID] = eventManagerProcess
     }
     
     /**
@@ -129,15 +101,16 @@ public enum EventManager:OTPActor_behavior{
      0.1
      */
     static func notify(name:String,message:SwErlMessage){
-        guard let PID = Registrar.instance.processesLinkedToName[name] else{
+        guard let PID = Registrar.getPid(forName:name) else{
             return//silently fail. No such event manager
         }
         notify(PID: PID,message: message)
     }
     static func notify(PID:Pid,message:SwErlMessage){
-        guard let eventManagerProcess = Registrar.instance.processesLinkedToPid[PID] else{
+        guard let eventManagerProcess = Registrar.getProcess(forID: PID) else{
             return//silently fail. No such event manager registered
         }
+        
         guard let handlers = eventManagerProcess.eventHandlers else{
             return//silently fail. Not an event handler
         }
@@ -146,6 +119,7 @@ public enum EventManager:OTPActor_behavior{
                 handler(PID,message)
             }
         }
+        
     }
     
 }

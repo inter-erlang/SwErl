@@ -8,7 +8,7 @@
 import XCTest
 @testable import SwErl
 
-final class SwErlEventManagerTests: XCTestCase {
+final class EventManagerTests: XCTestCase {
 
     override func setUp() {
         
