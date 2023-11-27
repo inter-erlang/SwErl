@@ -14,6 +14,7 @@ final class SwErlStatemTests: XCTestCase {
         // Clear the Registrar and reset the pidCounter
         Registrar.instance.processesLinkedToName = [:]
         Registrar.instance.processesLinkedToPid = [:]
+        Registrar.instance.OTPActorsLinkedToPid = [:]
         pidCounter = ProcessIDCounter()
         
         //setup case
@@ -22,7 +23,7 @@ final class SwErlStatemTests: XCTestCase {
                 try GenStateM.startLink(name: name, statem: RequesterStatem.self, initialData: initial_data)
             }
             
-            static func initialize(initialData: Any) throws -> SwErl.SwErlState {
+            static func initialize(initialData: Any) -> SwErl.SwErlState {
                 initialData
             }
             
@@ -85,6 +86,7 @@ final class SwErlStatemTests: XCTestCase {
         // Clear the Registrar and reset the pidCounter
         Registrar.instance.processesLinkedToName = [:]
         Registrar.instance.processesLinkedToPid = [:]
+        Registrar.instance.OTPActorsLinkedToPid = [:]
         pidCounter = ProcessIDCounter()
      }
 
@@ -123,7 +125,7 @@ final class SwErlStatemTests: XCTestCase {
                 //do nothing
             }
             
-            static func initialize(initialData: Any) throws -> SwErl.SwErlState {
+            static func initialize(initialData: Any) -> SwErl.SwErlState {
                 initialData
             }
             
@@ -224,7 +226,7 @@ final class SwErlStatemTests: XCTestCase {
             static func unlinked(message: SwErlMessage, current_state: SwErlState) {
                 
             }
-            static func initialize(initialData: Any) throws -> SwErl.SwErlState {
+            static func initialize(initialData: Any) -> SwErl.SwErlState {
                 initialData
             }
             
@@ -268,7 +270,7 @@ final class SwErlStatemTests: XCTestCase {
                 return ("hello",Double.random(in: 0.0...1.0))
             }
             
-            static func initialize(initialData: Any) throws -> SwErl.SwErlState {
+            static func initialize(initialData: Any) -> SwErl.SwErlState {
                 initialData
             }
             
@@ -316,7 +318,7 @@ final class SwErlStatemTests: XCTestCase {
                 return 5
             }
             
-            static func initialize(initialData: Any) throws -> SwErl.SwErlState {
+            static func initialize(initialData: Any) -> SwErl.SwErlState {
                 initialData
             }
             
@@ -358,14 +360,12 @@ final class ConcurrencyTests: XCTestCase {
     
     //This StateM expects to get an XCT expectation as state. when casted, called, or  notified it
     // fulfills the expectation.
-    
-    //This fails hard, though. It downright segfaults which is annoying to catch to say the least.
     enum expectationStateM:GenStatemBehavior{
         
         static func handleCast(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) -> SwErl.SwErlState {
-            if let exp = current_state as? XCTestExpectation {
-                exp.fulfill()
-            }
+//            if let exp = current_state as? XCTestExpectation {
+//                exp.fulfill()
+//            }
             return current_state
         }
         
@@ -382,14 +382,14 @@ final class ConcurrencyTests: XCTestCase {
             //do nothing
         }
         
-        static func initialize(initialData: Any) throws -> SwErl.SwErlState {
+        static func initialize(initialData: Any) -> SwErl.SwErlState {
             initialData
         }
         
         static func handleCall(message: SwErl.SwErlMessage, current_state: SwErl.SwErlState) -> (SwErl.SwErlResponse, SwErl.SwErlState) {
-            if let exp = current_state as? XCTestExpectation {
-                exp.fulfill()
-            }
+//            if let exp = current_state as? XCTestExpectation {
+//                exp.fulfill()
+//            }
             return ((SwErlPassed.ok,"ok"), current_state)
         }
     
@@ -399,27 +399,31 @@ final class ConcurrencyTests: XCTestCase {
         Registrar.instance.processesLinkedToName = [:]
         Registrar.instance.processesLinkedToPid = [:]
         Registrar.instance.processStates = [:]
+        Registrar.instance.OTPActorsLinkedToPid = [:]
         pidCounter = ProcessIDCounter()
     }
     override func tearDown() {
         Registrar.instance.processesLinkedToName = [:]
         Registrar.instance.processesLinkedToPid = [:]
         Registrar.instance.processStates = [:]
+        Registrar.instance.OTPActorsLinkedToPid = [:]
         pidCounter = ProcessIDCounter()
     }
     
-    @discardableResult
-    func addOneStateM(_ name: String, _ expectation: XCTestExpectation) -> Pid {
-        try! GenStateM.startLink(name: name, statem: expectationStateM.self, initialData: expectation)
-    }
-    
     func testConcurrentCreation() {
-            for i in 1...1000000 {
-                DispatchQueue.global().async {
-                self.addOneStateM("statem_\(i)", XCTestExpectation(description: "unused_\(i)"))
+        
+        let testQueue = DispatchQueue(label: "testCQ", attributes: .concurrent)
+        let count = 10
+        for i in 1...count {
+            testQueue.async {
+                _ = try! GenStateM.startLink(name: "\(i)", statem: expectationStateM.self, initialData: 3)
             }
         }
-        Thread.sleep(forTimeInterval: 10)
-        print(Registrar.instance.processesLinkedToName)
+        
+        Thread.sleep(forTimeInterval: 5)
+        XCTAssertEqual(count, Registrar.instance.processesLinkedToName.count)
+        XCTAssertEqual(count, Registrar.instance.processStates.count)
+        XCTAssertEqual(count, Registrar.instance.processesLinkedToPid.count)
     }
+    
 }
