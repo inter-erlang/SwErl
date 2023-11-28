@@ -6,30 +6,76 @@
 //
 
 import XCTest
+@testable import SwErl
 
 final class EventManagerConcurrencyTests: XCTestCase {
-
-    override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-    }
-
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
-    }
-
-    func testExample() throws {
-        // This is an example of a functional test case.
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // Any test you write for XCTest can be annotated as throws and async.
-        // Mark your test throws to produce an unexpected failure when your test encounters an uncaught error.
-        // Mark your test async to allow awaiting for asynchronous code to complete. Check the results with assertions afterwards.
-    }
-
-    func testPerformanceExample() throws {
-        // This is an example of a performance test case.
-        self.measure {
-            // Put the code you want to measure the time of here.
+    
+    func testConcurrentCreation() {
+        let testingHandlers = [{(PID:Pid, message:SwErlMessage) in
+            return
+        },{(PID:Pid, message:SwErlMessage) in
+            return
+        },{(PID:Pid, message:SwErlMessage) in
+            return
+        },{(PID:Pid, message:SwErlMessage) in
+            return
+        }]
+        let testQueue = DispatchQueue(label: "testCQ", attributes: .concurrent)
+        let count = 100000
+        var expectations:[XCTestExpectation] = []
+        for i in 1...count {
+            let linkExpectation = XCTestExpectation(description: "link\(i)")
+            expectations.append(linkExpectation)
+            testQueue.async {
+                do{
+                    _ = try EventManager.link(name: "tester\(i)", intialHandlers: testingHandlers)
+                    linkExpectation.fulfill()
+                }
+                catch{
+                    print("Creation failed: \(error)")
+                }
+            }
         }
+        wait(for: expectations, timeout: 20.0)
+        let blah = Registrar.instance
+        XCTAssertEqual(count, Registrar.instance.processesLinkedToName.count)
+        XCTAssertEqual(0, Registrar.instance.processStates.count)
+        XCTAssertEqual(count, Registrar.instance.processesLinkedToPid.count)
     }
-
+    
+    func testConcurrentNotifcation()throws {
+        let count = 100000
+        let expectationA = XCTestExpectation(description: "A")
+        expectationA.expectedFulfillmentCount = count
+        let expectationB = XCTestExpectation(description: "B")
+        expectationB.expectedFulfillmentCount = count
+        let expectationC = XCTestExpectation(description: "C")
+        expectationC.expectedFulfillmentCount = count
+        let expectationD = XCTestExpectation(description: "D")
+        expectationD.expectedFulfillmentCount = count
+        
+        let expectations = [expectationA,expectationB,expectationC,expectationD]
+        
+        let testingHandlers = [{(PID:Pid, message:SwErlMessage) in
+            expectationA.fulfill()
+            return
+        },{(PID:Pid, message:SwErlMessage) in
+            expectationB.fulfill()
+            return
+        },{(PID:Pid, message:SwErlMessage) in
+            expectationC.fulfill()
+            return
+        },{(PID:Pid, message:SwErlMessage) in
+            expectationD.fulfill()
+            return
+        }]
+        _ = try EventManager.link(name: "notification_tester", intialHandlers: testingHandlers)
+        let testQueue = DispatchQueue(label: "testCQ", attributes: .concurrent)
+        for i in 1...count {
+            testQueue.async {
+                EventManager.notify(name: "notification_tester", message: i)
+            }
+        }
+        wait(for: expectations, timeout: 20.0)
+    }
 }
