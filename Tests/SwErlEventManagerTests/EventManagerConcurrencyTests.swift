@@ -37,7 +37,6 @@ final class EventManagerConcurrencyTests: XCTestCase {
             }
         }
         wait(for: expectations, timeout: 20.0)
-        let blah = Registrar.instance
         XCTAssertEqual(count, Registrar.instance.processesLinkedToName.count)
         XCTAssertEqual(0, Registrar.instance.processStates.count)
         XCTAssertEqual(count, Registrar.instance.processesLinkedToPid.count)
