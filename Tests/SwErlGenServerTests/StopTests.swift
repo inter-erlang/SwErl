@@ -2,7 +2,7 @@
 //  File.swift
 //  
 //
-//  Created by SwErl on 10/30/23.
+//  Created by Sylvia Deal on 10/30/23.
 //
 import XCTest
 import Foundation
@@ -24,9 +24,10 @@ final class Stop : XCTestCase {
     
     //end the process with an empty associated dispatch queue
     func testEmptyQueue() {
-        GenServer.stop("server", "shutdown")
+        _ = GenServer.unlink("server", "shutdown")
         Thread.sleep(forTimeInterval: 1)
-        XCTAssert(Registrar.instance.OTPActorsLinkedToPid.isEmpty , "server ref not removed from pid:type dictionary")
+        XCTAssert(Registrar.instance.processesLinkedToPid.isEmpty , "server ref not removed from pid:type dictionary")
+
         XCTAssert(Registrar.instance.processesLinkedToName.isEmpty, "server ref not removed from name:pid dictionary")
     }
 }
@@ -54,7 +55,8 @@ final class FilledQueueStop: XCTestCase {
         let Q = DispatchQueue(label: "temp q to ensure things are added in order")
         
         Q.sync { try! GenServer.cast("queue server", "delay") }
-        Q.sync { GenServer.stop("queue server", "shutdown") }
+        _ = Q.sync { GenServer.unlink("queue server", "shutdown") }
+
 //        Thread.sleep(forTimeInterval: 0.1)
         Q.sync { try! GenServer.cast("queue server", "fulfill") }//error not expected here
         wait(for: [noRun], timeout: 4) //inverted expectation
@@ -67,7 +69,8 @@ final class FilledQueueStop: XCTestCase {
 final class AlreadyRegistered: XCTestCase {
     override func setUpWithError() throws {
         resetRegistryAndPIDCounter()
-        try GenServer.startLink("already registered", SimpleCastServer.self, nil)
+        try GenServer.startLink("already registered", SimpleCastServer.self, "state not used")
+
     }
     
     override func tearDown() {
@@ -76,7 +79,7 @@ final class AlreadyRegistered: XCTestCase {
     
     func testAlreadyRegistered() {
         XCTAssertThrowsError(
-            try GenServer.startLink("already registered", SimpleCastServer.self, nil),
+            try GenServer.startLink("already registered", SimpleCastServer.self, "state not used"),
             "attempt to register already registered gen server did not error"){ (error) in
                 XCTAssertEqual(error as! SwErlError, SwErlError.processAlreadyLinked,
                                "incorrect error type")

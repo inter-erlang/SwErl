@@ -119,6 +119,7 @@ public enum GenStateM:OTPActor_behavior{
         //the state machine will consume all requests serially in the order they were received
         let serialQueue = DispatchQueue(label: Pid.to_string(OTP_Pid) ,target: queueToUse)
         
+
         let handleCall = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
             return statem.handleCall(message: message, current_state: state)
         }
@@ -131,6 +132,7 @@ public enum GenStateM:OTPActor_behavior{
             return ((SwErlPassed.ok,nil),"")//this is ignored
         }
         
+
         let notify = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
             statem.notify(message: message, state: state)
             return ((SwErlPassed.ok,nil),"")//this is ignored
@@ -236,7 +238,8 @@ public enum GenStateM:OTPActor_behavior{
      0.1
      */
     
-    //being a cast-type call, no value is expected and all no failures throw
+    //being a cast-type message, no value is expected and all no failures throw
+
     //directly from these functions.
     static func cast(name:String,message:SwErlMessage){
         guard let PID = Registrar.instance.processesLinkedToName[name] else{
@@ -251,7 +254,8 @@ public enum GenStateM:OTPActor_behavior{
         //on which the processing will happen
         DispatchQueue.global().async {
             //if the pid hasn't been registered correctly, return.
-            guard let process = Registrar.instance.processesLinkedToPid[PID] else{
+            guard let process = Registrar.instance.processesLinkedToPid[PID] else{ //BUG concurrent reads on dict are not threadsafe. Access should be searialized by readers/writer queue
+
                 return
             }
             process.queue.sync {

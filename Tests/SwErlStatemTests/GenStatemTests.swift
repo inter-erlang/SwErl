@@ -14,7 +14,6 @@ final class SwErlStatemTests: XCTestCase {
         // Clear the Registrar and reset the pidCounter
         Registrar.instance.processesLinkedToName = [:]
         Registrar.instance.processesLinkedToPid = [:]
-        Registrar.instance.OTPActorsLinkedToPid = [:]
         pidCounter = ProcessIDCounter()
         
         //setup case
@@ -86,7 +85,6 @@ final class SwErlStatemTests: XCTestCase {
         // Clear the Registrar and reset the pidCounter
         Registrar.instance.processesLinkedToName = [:]
         Registrar.instance.processesLinkedToPid = [:]
-        Registrar.instance.OTPActorsLinkedToPid = [:]
         pidCounter = ProcessIDCounter()
      }
 

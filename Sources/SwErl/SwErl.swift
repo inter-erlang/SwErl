@@ -245,8 +245,6 @@ public func spawnGlobally(queueToUse:DispatchQueue = DispatchQueue.global(),name
  */
 infix operator ! : LogicalConjunctionPrecedence//this is left associative. That's why it has been chosen.
 extension Pid{
-    
-    
     @discardableResult public static func !( lhs: Pid, rhs: SwErlMessage)->SwErlResponse{
         //print("getting sync stateful: \(rhs)")
         guard let process = Registrar.getProcess(forID: lhs) else{
@@ -308,8 +306,8 @@ extension String{
  This struct represents a SwErl process.
  
   - Note: Each occurance of this struct is the data and metadata portion of the _modad_ pattern. The struct's metadata consists of a stateless or stateless closure, the queue it is to run on, and it's associated Pid. It's data is its current state if any. The functions that are part of the monad includes the SwErl ! infix operator among others.
-  - Author:
-    Lee S. Barney
+  - Authors:
+    Lee S. Barney, Sylvia Deal
   - Version:
     0.1
  */
@@ -323,14 +321,20 @@ struct SwErlProcess{
     var syncStatefulLambda:((Pid,SwErlState,SwErlMessage)->(SwErlResponse,SwErlState))? = nil
     
     var asyncStatefulLambda:((Pid,SwErlState,SwErlMessage)->SwErlState)? = nil
+  
     ///
     ///this lambda has two parameters. The first is the registered
     ///name, self, and the second is the message
+    //
     var statelessLambda:((Pid, SwErlMessage)->Void)? = nil
+  
+    // call, cast, unlinked, notify in that order. Genserver notify is simply included as asyncstateful.
+    //A SwErl process should never have both GenStateM and genServer functionality simultaneously.
     var GenStatemProcessWrappers:(SwErlClosure,SwErlClosure,SwErlClosure,SwErlClosure)? = nil
+    var genServerBehavior: GenServerBehavior.Type? = nil
     var eventHandlers:[SwErlStatelessHandler]? = nil
+  
     let registeredPid:Pid
-    
     //
     //stateful lambdas have a serial dispatch queue unique to themselves that,
     //by default, feeds the global async dispatch queue. Since there is no
@@ -345,7 +349,6 @@ struct SwErlProcess{
         self.queue = DispatchQueue(label: Pid.to_string(registrationID) ,target: queueToUse)
         self.syncStatefulLambda = functionality
         self.registeredPid = registrationID
-        
     }
     
     //asynchronously used process
@@ -364,7 +367,7 @@ struct SwErlProcess{
         self.statelessLambda = functionality
         self.registeredPid = registrationID
     }
-    
+
     //GenStatem initialization
     init(queueToUse:DispatchQueue = DispatchQueue.global(),
          registrationID:Pid,
@@ -372,8 +375,7 @@ struct SwErlProcess{
         self.queue = queueToUse
         self.GenStatemProcessWrappers = OTP_Wrappers
         self.registeredPid = registrationID
-    }
-    
+    }		
     //EventManager initialization
     init(queueToUse:DispatchQueue = DispatchQueue.global(),
          registrationID:Pid, eventHandlers:[SwErlStatelessHandler]){
@@ -405,26 +407,28 @@ struct Registrar{
     
     var processesLinkedToPid:[Pid:SwErlProcess] = [:]
     var processesLinkedToName:[String:Pid] = [:]
-    
-    var OTPActorsLinkedToPid: [Pid : (OTPActor_behavior.Type, DispatchQueue)] = [:]
     var processStates:[Pid:Any] = [:]
-    
+
+
     static func generatePid()->Pid{
         queue.sync(flags: .barrier){
             let (aSerial,aCreation) = pidCounter.next()
             return Pid(id: 0, serial: aSerial, creation: aCreation)
         }
     }
-    
+ 
     static func link(_ toBeAdded:SwErlProcess, initState:Any = "SwErlNone", name:String = "SwErlNone", PID:Pid) throws{
         try queue.sync(flags: .barrier) {
             if instance.processesLinkedToPid[PID] != nil{
                 throw SwErlError.processAlreadyLinked
             }
             instance.processesLinkedToPid[PID] = toBeAdded
-                
+            
             if name != "SwErlNone"{
-                instance.processesLinkedToName[name] = PID
+                if instance.processesLinkedToName[name] != nil {
+                    throw SwErlError.processAlreadyLinked
+                }
+            instance.processesLinkedToName[name] = PID
                 
             }
            guard let stateString = initState as? String else{
@@ -436,25 +440,6 @@ struct Registrar{
             }
         }
     }
-
-    static func link<T:OTPActor_behavior>(callbackType: T.Type, processQueue: DispatchQueue, 
-                                          initState: Any?, name:String = "SwErlNone", PID:Pid) throws{
-        guard  !Registrar.pidLinked(PID) && !Registrar.nameLinked(name)  else { //better way to invert guard expression?
-            throw SwErlError.processAlreadyLinked
-        }
-        //Dicts must be built from state up, otherwise null memory can be accessed:
-        //state -> pid
-        // pid -> callback
-        // name -> pid
-        queue.sync(flags: .barrier) {
-            instance.processStates[PID] = initState
-            instance.OTPActorsLinkedToPid[PID] = (callbackType, processQueue)
-            if name != "SwErlNone"{
-                instance.processesLinkedToName[name] = PID
-            }
-        }
-    }
-    
     /**
      This function is used to remove the link between a Pid and a SwErl process. The process is also removed.
        - Parameters:
@@ -467,7 +452,6 @@ struct Registrar{
      */
     static func unlink(_ registrationID:Pid){
         _ = queue.sync(flags: .barrier) { instance.processesLinkedToPid.removeValue(forKey: registrationID) }
-        _ = queue.sync(flags: .barrier) { instance.OTPActorsLinkedToPid.removeValue(forKey: registrationID) }
     }
     
     /**
@@ -501,10 +485,6 @@ struct Registrar{
         return queue.sync{
             instance.processesLinkedToPid[forID]
         }
-    }
-    
-    static func getOtpProcess(forID: Pid) -> (OTPActor_behavior.Type, DispatchQueue)? {
-        return queue.sync{ instance.OTPActorsLinkedToPid[forID] }
     }
     /**
      This function provides access to a process by name.
@@ -541,17 +521,6 @@ struct Registrar{
     static func setProcessState(forID: Pid, value: Any) {
         return queue.sync(flags: .barrier){ instance.processStates[forID] = value }
     }
-    static func otpPidLinked(_ forID: Pid) -> Bool {
-        queue.sync {
-            switch instance.OTPActorsLinkedToPid[forID] {
-            case nil :
-                return false
-            default:
-                return true
-            }
-        }
-    }
-    
     static func pidLinked(_ forID: Pid) -> Bool {
         queue.sync {
             switch instance.processesLinkedToPid[forID] {
@@ -564,15 +533,14 @@ struct Registrar{
     }
     
     static func nameLinked(_ forName: String) -> Bool {
-        queue.sync {
+        return queue.sync { () -> Bool in
             switch instance.processesLinkedToName[forName] {
             case nil :
                 return false
             default:
-                return true
-            }
-        }
+              return true
     }
+
     /**
      This function provides a list of all linked Pids.
        - Parameters: none

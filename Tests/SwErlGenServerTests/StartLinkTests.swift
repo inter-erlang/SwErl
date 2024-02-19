@@ -2,7 +2,7 @@
 //  File.swift
 //  
 //
-//  Created by SwErl on 11/5/23.
+//  Created by Sylvia Deal on 11/5/23.
 //
 
 import Foundation
@@ -28,16 +28,15 @@ final class Unnamed : XCTestCase {
         let initialState: Any = 10 as Any
         let serverPid = try! GenServer.startLink(SimpleCastServer.self, initialState)
         //check that the registry populated correctly
-        let (serverType,_) = try XCTUnwrap(
-            Registrar.instance.OTPActorsLinkedToPid[serverPid], "failed to unwrap type from pid")
+        let process = try XCTUnwrap(
+            Registrar.instance.processesLinkedToPid[serverPid], "failed to unwrap type from pid")
         let serverData = try XCTUnwrap(
             Registrar.instance.processStates[serverPid], "failed to unwrap data from dict")
         XCTAssertNoThrow(serverData as! Int)
-        XCTAssertNoThrow(serverType as! SimpleCastServer.Type)
+        XCTAssertNoThrow(process.genServerBehavior as! SimpleCastServer.Type)
+
         XCTAssertEqual(10, serverData as! Int, "State not properly registered")
     }
-        
-
 }
 
 final class Named : XCTestCase {
@@ -54,11 +53,12 @@ final class Named : XCTestCase {
         let name = try GenServer.startLink("name_test", SimpleCastServer.self, initialState)
         let serverPid = try XCTUnwrap(
             Registrar.instance.processesLinkedToName[name], "failed to unwrap pid from name")
-        let (serverType,_) = try XCTUnwrap(
-            Registrar.instance.OTPActorsLinkedToPid[serverPid], "failed to unwrap type from pid")
+        let process = try XCTUnwrap(
+            Registrar.instance.processesLinkedToPid[serverPid], "failed to unwrap type from pid")
         let serverData = try XCTUnwrap(
             Registrar.instance.processStates[serverPid], "failed to unwrap data from dict")
-        XCTAssertNoThrow(serverType as! SimpleCastServer.Type)
+        XCTAssertNoThrow(process.genServerBehavior as! SimpleCastServer.Type)
+
         XCTAssertNoThrow(serverData as! Int)
         XCTAssertEqual(firstPid, serverPid, "PID not registered")
         XCTAssertEqual(10, serverData as! Int, "State not properly registered")

@@ -53,14 +53,12 @@ final class GenStatemConcurrencyTests: XCTestCase {
         Registrar.instance.processesLinkedToName = [:]
         Registrar.instance.processesLinkedToPid = [:]
         Registrar.instance.processStates = [:]
-        Registrar.instance.OTPActorsLinkedToPid = [:]
         pidCounter = ProcessIDCounter()
     }
     override func tearDown() {
         Registrar.instance.processesLinkedToName = [:]
         Registrar.instance.processesLinkedToPid = [:]
         Registrar.instance.processStates = [:]
-        Registrar.instance.OTPActorsLinkedToPid = [:]
         pidCounter = ProcessIDCounter()
     }
     

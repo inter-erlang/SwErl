@@ -3,7 +3,7 @@
 //  
 //  contains functions and definitions which would otherwise
 //  be repeated across tests
-//  Created by SwErl on 10/30/23.
+//  Created by Sylvia Deal on 10/30/23.
 //
 
 import XCTest
@@ -15,20 +15,20 @@ let firstPid = Pid(id: 0, serial: 1, creation: 0)
 func resetRegistryAndPIDCounter() {
     Registrar.instance.processesLinkedToName = [:]
     Registrar.instance.processesLinkedToPid = [:]
-    Registrar.instance.OTPActorsLinkedToPid = [:]
     Registrar.instance.processStates = [:]
     pidCounter = ProcessIDCounter()
 }
 
 enum SimpleCastServer : GenServerBehavior {
+    static func handleNotify(pid: Pid, request: Any, data: Any?) -> Any? {
+        return nil
+    }
     static func initializeData(_ state: Any?) -> Any? {
         return state
     }
-    
     static func terminateCleanup(reason: String, data: Any?) {
         
     }
-    
     static func handleCast(request: Any, data: Any?)  -> Any?{
         if let exp = data as? XCTestExpectation {
             exp.fulfill()
@@ -41,6 +41,9 @@ enum SimpleCastServer : GenServerBehavior {
 }
 
 enum expectationServer : GenServerBehavior {
+    static func handleNotify(pid: SwErl.Pid, request: Any, data: Any?) -> Any? {
+        return nil
+    }
     static func initializeData(_ state: Any?) -> Any? {
         return state
     }
@@ -57,9 +60,9 @@ enum expectationServer : GenServerBehavior {
             let exp = data as! XCTestExpectation
             exp.fulfill()
         default:
-            return request
+            return data
         }
-        return request
+        return data
     }
     static func handleCall(request: Any, data: Any) -> (Any, Any) {
         return (request, data)
@@ -67,14 +70,15 @@ enum expectationServer : GenServerBehavior {
 }
 
 enum concurrencyServer : GenServerBehavior {
+    static func handleNotify(pid: SwErl.Pid, request: Any, data: Any?) -> Any? {
+        return nil
+    }
     static func initializeData(_ state: Any?) -> Any? {
         state
     }
-    
     static func terminateCleanup(reason: String, data: Any?) {
         
     }
-    
     static func handleCast(request: Any, data: Any?) -> Any?{
         switch request {
         case let request as String where request == "read" :
