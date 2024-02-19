@@ -92,7 +92,9 @@ final class SwErlTests: XCTestCase {
             expectation.fulfill()
             return
         }
-        "silly" ! 5
+        let (worked,result) = "silly" ! 5
+        XCTAssertEqual(SwErlPassed.ok, worked)
+        XCTAssertNil(result)
         wait(for: [expectation], timeout: 10.0)
     }
     
@@ -102,12 +104,34 @@ final class SwErlTests: XCTestCase {
             expectation.fulfill()
             return
         }
-        Pid ! 5
+        let (worked,result) = Pid ! 5
+        XCTAssertEqual(SwErlPassed.ok, worked)
+        XCTAssertNil(result)
+        wait(for: [expectation], timeout: 10.0)
+    }
+    
+    func testStatefulProcessSendMessageUsingPid() throws {
+        let expectation = XCTestExpectation(description: "send completed.")
+        let Pid = try spawn(initialState: 3)
+        {(PID, state, message) in
+            expectation.fulfill()
+            return 3
+        }
+        let (worked,result) = Pid ! 5
+        XCTAssertEqual(SwErlPassed.ok, worked)
+        XCTAssertNil(result)
         wait(for: [expectation], timeout: 10.0)
     }
     
     func testNotRegisteredPid() throws{
         XCTAssertNoThrow(Pid(id: 0, serial: 0, creation: 0) ! "hello")
+        let (worked,error) = Pid(id: 0, serial: 0, creation: 0) ! "hello"
+        guard let error = error as? SwErlError else{
+            XCTAssertTrue(false)
+            return
+        }
+        XCTAssertEqual(SwErlPassed.fail, worked)
+        XCTAssertEqual(SwErlError.notRegisteredByPid, error)
     }
     func testChainingByCapture() throws{
         //don't let the test end until the last process
@@ -184,8 +208,8 @@ final class SwErlTests: XCTestCase {
         let stateless = try SwErlProcess(registrationID: bingo){(name, message) in
             return
         }
-        XCTAssertNil(stateless.statefulLambda)
-        XCTAssertNil(stateless.state)
+        XCTAssertNil(stateless.syncStatefulLambda)
+        XCTAssertNil(stateless.asyncStatefulLambda)
         XCTAssertEqual(stateless.queue, DispatchQueue.global())
         XCTAssertEqual(stateless.registeredPid, bingo)
         XCTAssertNotNil(stateless.statelessLambda)
@@ -197,8 +221,8 @@ final class SwErlTests: XCTestCase {
         let stateless = try SwErlProcess(queueToUse:DispatchQueue.main, registrationID: mainBingo){(name, message) in
             return
         }
-        XCTAssertNil(stateless.statefulLambda)
-        XCTAssertNil(stateless.state)
+        XCTAssertNil(stateless.syncStatefulLambda)
+        XCTAssertNil(stateless.asyncStatefulLambda)
         XCTAssertEqual(stateless.queue, DispatchQueue.main)
         XCTAssertEqual(stateless.registeredPid, mainBingo)
         XCTAssertNotNil(stateless.statelessLambda)
@@ -206,35 +230,40 @@ final class SwErlTests: XCTestCase {
     }
     
     func testStatefulSwerlProcessWithDefaults() throws {
-        let hasState = Pid(id: 0, serial: 1, creation: 0)
-        let stateful:SwErlProcess = try! SwErlProcess(registrationID: hasState,initialState: ["eggs","flour"]){(procName, message ,state) in
+        let hasStatePID = Pid(id: 0, serial: 1, creation: 0)
+        let stateful:SwErlProcess = SwErlProcess(registrationID: hasStatePID){(procName, message ,state) -> (SwErlResponse,SwErlState) in
             var updatedState:[String] = state as![String]
             updatedState.append(message as! String)
-            return (true,updatedState)
+            return ((SwErlPassed.ok,7),updatedState)
         }
         XCTAssertNil(stateful.statelessLambda)
-        XCTAssertNotNil(stateful.state)
-        XCTAssertTrue(["eggs","flour"] == stateful.state as! [String])
-        XCTAssertEqual(stateful.queue.label, Pid.to_string(hasState))
-        XCTAssertEqual(stateful.registeredPid, hasState)
-        XCTAssertNotNil(stateful.statefulLambda)
-        XCTAssertTrue(stateful.statefulLambda!(hasState,"butter",["salt","water"]) as!(Bool,[String]) == (true,["salt","water","butter"]))
+        XCTAssertEqual(stateful.queue.label, Pid.to_string(hasStatePID))
+        XCTAssertEqual(stateful.registeredPid, hasStatePID)
+        XCTAssertNotNil(stateful.syncStatefulLambda)
+        //test the stored closure
+        let ((passed,responseValue),ingredients) = stateful.syncStatefulLambda!(hasStatePID,"butter",["salt","water"]) as!((SwErlPassed,Int),[String])
+        XCTAssertEqual(SwErlPassed.ok, passed)
+        XCTAssertEqual(7, responseValue)
+        XCTAssertEqual(["salt","water","butter"], ingredients)
     }
     
     func testStatefulSwerlProcessNoDefaults() throws {
-        let hasState = Pid(id: 0, serial: 1, creation: 0)
-        let stateful:SwErlProcess = try! SwErlProcess(queueToUse:DispatchQueue.main,registrationID: hasState,initialState: ["eggs","flour"]){(procName, message ,state) in
+        let hasStatePID = Pid(id: 0, serial: 1, creation: 0)
+        let stateful:SwErlProcess = SwErlProcess(registrationID: hasStatePID){(procName, message ,state)-> (SwErlResponse,SwErlState) in
                 var updatedState:[String] = state as![String]
                 updatedState.append(message as! String)
-                return (true,updatedState)
+            return ((SwErlPassed.ok,7),updatedState)
             }
         XCTAssertNil(stateful.statelessLambda)
-        XCTAssertNotNil(stateful.state)
-        XCTAssertTrue(["eggs","flour"] == stateful.state as! [String])
-        XCTAssertEqual(stateful.queue.label, Pid.to_string(hasState))
-        XCTAssertEqual(stateful.registeredPid, hasState)
-        XCTAssertNotNil(stateful.statefulLambda)
-        XCTAssertTrue(stateful.statefulLambda!(hasState,"butter",["salt","water"]) as!(Bool,[String]) == (true,["salt","water","butter"]))
+        XCTAssertNil(stateful.asyncStatefulLambda)
+        XCTAssertEqual(stateful.queue.label, Pid.to_string(hasStatePID))
+        XCTAssertEqual(stateful.registeredPid, hasStatePID)
+        XCTAssertNotNil(stateful.syncStatefulLambda)
+        //test the stored closure
+        let ((passed,responseValue),ingredients) = stateful.syncStatefulLambda!(hasStatePID,"butter",["salt","water"]) as!((SwErlPassed,Int),[String])
+        XCTAssertEqual(SwErlPassed.ok, passed)
+        XCTAssertEqual(7, responseValue)
+        XCTAssertEqual(["salt","water","butter"], ingredients)
     }
     
     func testSwErlRegistry() throws{
@@ -280,109 +309,72 @@ final class SwErlTests: XCTestCase {
         XCTAssertNil(Registrar.getProcess(forID: second))
         XCTAssertEqual(2, Registrar.getAllPIDs().count)
         
-    }
-    func testSequencingOfStatefulProcesses()throws{
         
-        let pid = try spawn(initialState: ""){(procID,state,message) in
-            Thread.sleep(forTimeInterval: message as! Double)
+        XCTAssertTrue(Registrar.pidLinked(third), "pidLinked not reporting true for extant pid")
+        XCTAssertFalse(Registrar.pidLinked(second), "pidLinked not reporting false for extant pid")
+
+    }
+    func testSequencingOfSyncStatefulProcesses()throws{
+        
+        var expectations:[XCTestExpectation] = []
+        let PID = try spawn(initialState: ""){(procID,state,message) ->(SwErlResponse,SwErlState) in
+            guard let (data,expectation) = message as? (Double,XCTestExpectation) else{
+                return ((SwErlPassed.fail,"malformed message"),state)
+            }
+            guard let state = state as? String else{
+                return ((SwErlPassed.fail,SwErlError.invalidState),"")
+            }
+            expectation.fulfill()
+            if state == ""{
+                return ((SwErlPassed.ok,"worked"),"\(data)")
+            }
+            return ((SwErlPassed.ok,"worked"),"\(state),\(data)")
+        }
+        expectations.append(XCTestExpectation(description: "first"))
+        expectations.append(XCTestExpectation(description: "second"))
+        expectations.append(XCTestExpectation(description: "third"))
+        PID ! (5.0,expectations[0])
+        PID ! (2.0,expectations[1])
+        PID ! (0.0,expectations[2])
+        
+        wait(for: expectations, timeout: 30.0)
+        XCTAssertEqual("5.0,2.0,0.0", Registrar.instance.processStates[PID] as! String)
+    }
+    
+    func testSequencingOfAsyncStatefulProcesses()throws{
+        
+        let expectation1 = XCTestExpectation(description: "first serially correct")
+        let expectation2 = XCTestExpectation(description: "second serially correct")
+        let expectation3 = XCTestExpectation(description: "third serially correct")
+        let pid = try spawn(initialState: ""){(procID,state,message) ->Any in
+            _ = self.factorial(num: 15)
             guard let state = state as? String else{
                 return ""
+            }
+            if message as! Double == 5.0 && state == ""{
+                    expectation1.fulfill()
+            }
+            else if message as! Double == 2.0 && state == "5.0"{
+                expectation2.fulfill()
+            }
+            else if message as! Double == 0.0 && state == "5.0,2.0"{
+                expectation3.fulfill()
             }
             if state == ""{
                 return "\(message as! Double)"
             }
             return "\(state),\(message as! Double)"
         }
-        pid ! 5.0
-        pid ! 2.0
-        pid ! 0.0
-        
-
-        XCTAssertEqual("5.0,2.0,0.0", Registrar.getProcess(forID: pid)?.state as! String)
+        var (passed,_) = pid ! 5.0
+        XCTAssertEqual(SwErlPassed.ok, passed)
+        (passed,_) = pid ! 2.0
+        XCTAssertEqual(SwErlPassed.ok, passed)
+        (passed,_) = pid ! 0.0
+        XCTAssertEqual(SwErlPassed.ok, passed)
     }
     
-    
-    
-    @available(macOS 13.0, *)
-    func testSizeAndSpeed() throws{
-        
-        print("\n\n\n!!!!!!!!!!!!!!!!!!! \nsize of SwErlProcess: \(MemoryLayout<SwErlProcess>.size ) bytes")
-        
-        let stateless = {@Sendable(procName:Pid, message:Any) in
-            return
-        }
-        let stateful = {@Sendable (pid:Pid,state:Any,message:Any)->Any in
-            return 7
-        }
-        let timer = ContinuousClock()
-        let count:Int64 = 1000000
-        var totalTime:Int64 = 0
-        for _ in 0..<count{
-            let time = try timer.measure{
-                _ = try spawn(function: stateless)
-            }
-            totalTime = totalTime + time.components.attoseconds
-        }
-        print("stateless spawning took \(totalTime/count) attoseconds per instantiation")
-        totalTime = 0
-        for _ in 0..<count{
-            let time = try timer.measure{
-                _ = try spawn(initialState: 7, function: stateful)
-            }
-            totalTime = totalTime + time.components.attoseconds
-        }
-        print("stateful spawning took \(totalTime/count) attoseconds per instantiation\n!!!!!!!!!!!!!!!!!!!\n\n\n")
-        Registrar.instance.processesLinkedToPid = [:]//clear the million registered processes
-        print("!!!!!!!!!!!!!!!!!!! \n Sending \(count) messages to stateful process")
-        var Pid = try spawn(initialState: 7, function: stateful)
-        totalTime = 0
-        for _ in 0..<count{
-            let time = timer.measure{
-                Pid ! 3
-            }
-            totalTime = totalTime + time.components.attoseconds
-        }
-        print(" Stateful SwErl message passing took \(totalTime/count) attoseconds per message sent\n!!!!!!!!!!!!!!!!!!!\n\n\n")
-        
-        print("!!!!!!!!!!!!!!!!!!! \n Sending \(count) messages to stateless process")
-        Pid = try spawn(function: stateless)
-        totalTime = 0
-        for _ in 0..<count{
-            let time = timer.measure{
-                Pid ! 3
-            }
-            totalTime = totalTime + time.components.attoseconds
-        }
-        print(" Stateless SwErl message passing took \(totalTime/count) attoseconds per message sent\n!!!!!!!!!!!!!!!!!!!\n\n\n")
-        totalTime = 0
-        for _ in 0..<count{
-            let time = timer.measure{
-                Task {
-                    await duplicateStatelessProcessBehavior(message:"hello")
-                }
-            }
-            totalTime = totalTime + time.components.attoseconds
-        }
-        print("stateless Async/await took \(totalTime/count) attoseconds per task started\n!!!!!!!!!!!!!!!!!!!\n\n\n")
-        totalTime = 0
-        for _ in 0..<count{
-            let time = timer.measure{
-                DispatchQueue.global().async {
-                    self.doNothing()
-                    
-                }
-            }
-            totalTime = totalTime + time.components.attoseconds
-        }
-        print("Stateless dispatch queue took \(totalTime/count) attoseconds per call started\n!!!!!!!!!!!!!!!!!!!\n\n\n")
-        
+    func factorial(num:Int64)->Int64{
+        let nums: [Int64] = Array(1...num)
+        return nums.reduce(1){$0*$1}
     }
-    
-    func duplicateStatelessProcessBehavior(message:String) async{
-        return
-    }
-    func doNothing(){
-        return
-    }
-
 }

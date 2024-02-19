@@ -27,6 +27,7 @@ final class Stop : XCTestCase {
         _ = GenServer.unlink("server", "shutdown")
         Thread.sleep(forTimeInterval: 1)
         XCTAssert(Registrar.instance.processesLinkedToPid.isEmpty , "server ref not removed from pid:type dictionary")
+
         XCTAssert(Registrar.instance.processesLinkedToName.isEmpty, "server ref not removed from name:pid dictionary")
     }
 }
@@ -55,6 +56,7 @@ final class FilledQueueStop: XCTestCase {
         
         Q.sync { try! GenServer.cast("queue server", "delay") }
         _ = Q.sync { GenServer.unlink("queue server", "shutdown") }
+
 //        Thread.sleep(forTimeInterval: 0.1)
         Q.sync { try! GenServer.cast("queue server", "fulfill") }//error not expected here
         wait(for: [noRun], timeout: 4) //inverted expectation
@@ -68,6 +70,7 @@ final class AlreadyRegistered: XCTestCase {
     override func setUpWithError() throws {
         resetRegistryAndPIDCounter()
         try GenServer.startLink("already registered", SimpleCastServer.self, "state not used")
+
     }
     
     override func tearDown() {

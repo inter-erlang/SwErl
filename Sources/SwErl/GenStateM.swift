@@ -119,19 +119,21 @@ public enum GenStateM:OTPActor_behavior{
         //the state machine will consume all requests serially in the order they were received
         let serialQueue = DispatchQueue(label: Pid.to_string(OTP_Pid) ,target: queueToUse)
         
-        let handleCall = {(message:SwErlMessage,state:SwErlState)-> (SwErlResponse,SwErlState) in
+
+        let handleCall = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
             return statem.handleCall(message: message, current_state: state)
         }
-        let handleCast = {(message:SwErlMessage,state:SwErlState)-> (SwErlResponse,SwErlState) in
+        let handleCast = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
             return ((SwErlPassed.ok,nil),statem.handleCast(message: message, current_state: state))
         }
         
-        let unlinked = {(message:SwErlMessage,state:SwErlState)-> (SwErlResponse,SwErlState) in
+        let unlinked = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
             statem.unlinked(message: message, current_state: state)
             return ((SwErlPassed.ok,nil),"")//this is ignored
         }
         
-        let notify = {(message:SwErlMessage,state:SwErlState)-> (SwErlResponse,SwErlState) in
+
+        let notify = {(message:SwErlMessage,state:SwErlState)->(SwErlResponse,SwErlState) in
             statem.notify(message: message, state: state)
             return ((SwErlPassed.ok,nil),"")//this is ignored
         }
@@ -237,6 +239,7 @@ public enum GenStateM:OTPActor_behavior{
      */
     
     //being a cast-type message, no value is expected and all no failures throw
+
     //directly from these functions.
     static func cast(name:String,message:SwErlMessage){
         guard let PID = Registrar.instance.processesLinkedToName[name] else{
@@ -252,6 +255,7 @@ public enum GenStateM:OTPActor_behavior{
         DispatchQueue.global().async {
             //if the pid hasn't been registered correctly, return.
             guard let process = Registrar.instance.processesLinkedToPid[PID] else{ //BUG concurrent reads on dict are not threadsafe. Access should be searialized by readers/writer queue
+
                 return
             }
             process.queue.sync {

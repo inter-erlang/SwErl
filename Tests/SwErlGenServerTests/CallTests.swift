@@ -27,6 +27,7 @@ final class CallTests : XCTestCase {
     
     func testMutatingCall() {
         let (_, res) = try! GenServer.call("wisteria", "write")
+
         XCTAssertEqual(1, res as! Int, "state did not mutate correctly")
     }
 }

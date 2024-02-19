@@ -26,11 +26,9 @@ enum SimpleCastServer : GenServerBehavior {
     static func initializeData(_ state: Any?) -> Any? {
         return state
     }
-    
     static func terminateCleanup(reason: String, data: Any?) {
         
     }
-    
     static func handleCast(request: Any, data: Any?)  -> Any?{
         if let exp = data as? XCTestExpectation {
             exp.fulfill()
@@ -46,7 +44,6 @@ enum expectationServer : GenServerBehavior {
     static func handleNotify(pid: SwErl.Pid, request: Any, data: Any?) -> Any? {
         return nil
     }
-
     static func initializeData(_ state: Any?) -> Any? {
         return state
     }
@@ -76,15 +73,12 @@ enum concurrencyServer : GenServerBehavior {
     static func handleNotify(pid: SwErl.Pid, request: Any, data: Any?) -> Any? {
         return nil
     }
-
     static func initializeData(_ state: Any?) -> Any? {
         state
     }
-    
     static func terminateCleanup(reason: String, data: Any?) {
         
     }
-    
     static func handleCast(request: Any, data: Any?) -> Any?{
         switch request {
         case let request as String where request == "read" :

@@ -34,10 +34,9 @@ final class Unnamed : XCTestCase {
             Registrar.instance.processStates[serverPid], "failed to unwrap data from dict")
         XCTAssertNoThrow(serverData as! Int)
         XCTAssertNoThrow(process.genServerBehavior as! SimpleCastServer.Type)
+
         XCTAssertEqual(10, serverData as! Int, "State not properly registered")
     }
-        
-
 }
 
 final class Named : XCTestCase {
@@ -59,6 +58,7 @@ final class Named : XCTestCase {
         let serverData = try XCTUnwrap(
             Registrar.instance.processStates[serverPid], "failed to unwrap data from dict")
         XCTAssertNoThrow(process.genServerBehavior as! SimpleCastServer.Type)
+
         XCTAssertNoThrow(serverData as! Int)
         XCTAssertEqual(firstPid, serverPid, "PID not registered")
         XCTAssertEqual(10, serverData as! Int, "State not properly registered")

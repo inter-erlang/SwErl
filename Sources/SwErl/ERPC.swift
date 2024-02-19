@@ -1,7 +1,6 @@
 //
-//  OTP_base.swift
-//
-//Copyright (c) 2023 Lee Barney
+//  RPC.swift
+//  
 //
 //Permission is hereby granted, free of charge, to any person obtaining a copy
 //of this software and associated documentation files (the "Software"), to deal
@@ -21,15 +20,25 @@
 //OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 //SOFTWARE.
 //
-//  Created by Lee Barney on 10/3/23.
+//  Created by Lee Barney on 11/20/23.
 //
 
+import Foundation
 
-
-/**
- This behavior exists as a base protocol for all non-process SwErl actors.
- Since it is the base, all types of SwErl actors can be accumulated in
- shared data structures without resorting to using Swift's Any BIT (Built In Type).
- */
-public protocol OTPActor_behavior{
+enum ERPC{
+    func cast(node:String,module:String,function:String,parameters:[Any]) {
+        
+    }
+    func multicast(nodes:[String],module:String,function:String,parameters:[Any]){
+        
+    }
+    func call(node:String,module:String,function:String,parameters:[Any])->Any{
+        
+        return 0
+    }
+    func multicall(nodes:[String],module:String,function:String,parameters:[Any])->[Any]{
+        
+        return [0]
+    }
 }
+

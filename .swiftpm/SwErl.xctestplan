@@ -27,6 +27,20 @@
         "identifier" : "SwErlStatemTests",
         "name" : "SwErlStatemTests"
       }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "SwErlEventManagerTests",
+        "name" : "SwErlEventManagerTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "GenServerAPITests",
+        "name" : "GenServerAPITests"
+      }
     }
   ],
   "version" : 1

@@ -170,6 +170,7 @@ public enum GenServer {
             return (SwErlPassed.fail, SwErlError.notGenServer_behavior)
         }
         process.queue.async {
+
             guard let state = Registrar.getProcessState(forID: pid) else {
                 return
             }
@@ -241,6 +242,7 @@ public enum GenServer {
 
         }
         process.queue.async {
+
             guard let state = Registrar.getProcessState(forID: id) else {
                 return
             }
@@ -272,7 +274,7 @@ public enum GenServer {
         }
         return try call(pid, message)
     }
-    
+  
     /// Sends a call message to a given genserver instance. The corrosponding .handleCall() method will be executed by the
     /// genserver instance. This function waits for the called genserver to finish executing and returns a reply.
     /// - Parameters:
@@ -304,6 +306,7 @@ public enum GenServer {
         let response = process.queue.sync { () -> Any in
             guard let state = Registrar.getProcessState(forID: id) else {
                 return (SwErlPassed.fail, SwErlError.invalidState)
+
             }
             let (response, updateState) = genServer.handleCall(request: message, data: state)
             
