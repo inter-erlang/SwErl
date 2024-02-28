@@ -11,15 +11,11 @@ import XCTest
 final class SafeDataStructuresTests: XCTestCase {
     
     override func setUpWithError() throws {
-      
-        Registrar.local.processesLinkedToPid = [:]
-        Registrar.local.processesLinkedToName = [:]
+        // Put setup code here. This method is called before the invocation of each test method in the class.
     }
     
     override func tearDownWithError() throws {
-        
-          Registrar.local.processesLinkedToPid = [:]
-          Registrar.local.processesLinkedToName = [:]
+        // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
     
     func testBuildSafeAddGet() throws {
