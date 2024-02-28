@@ -111,11 +111,11 @@ extension Data {
     /// where length is the number of bytes in .utf8.
     var fromAtomUTF8Ext: (SwErlAtom, Data)? {
         get {
-            guard self.count >= 5 else {
+            guard self.count >= 4 else {
                 return nil
             }
-            let nameLength = Int(self[1...4].toMachineByteOrder.toUInt32)
-            var reduced = self.dropFirst(5)
+            let nameLength = Int(self.prefix(4).toMachineByteOrder.toUInt32)
+            var reduced = self.dropFirst(4)
             guard reduced.count >= nameLength, let result = String(bytes: reduced.prefix(nameLength), encoding: .utf8) else {
                 return nil
             }
@@ -147,18 +147,18 @@ extension Data {
         get {
             let blah = Array(self)
             let blif = self.count
-            guard self.count == 4 else {
+            guard self.count >= 4 else {
                 return nil
             }
             var value: Int = 0
-            let asUnsigned = self.toMachineByteOrder.toUInt32
+            let asUnsigned = self.prefix(4).toMachineByteOrder.toUInt32
             
             if asUnsigned > Int32.max {
                 value = Int(~(asUnsigned - 1)) * -1 // Handle negative numbers
             } else {
                 value = Int(asUnsigned)
             }
-            let reduced = self.dropFirst(5)
+            let reduced = self.dropFirst(4)
             return (value, Data(reduced))
         }
     }
