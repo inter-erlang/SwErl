@@ -273,7 +273,7 @@ final class SwErlSpeedTests: XCTestCase {
         
     let timer = ContinuousClock()
         
-        for count in stride(from: 1000, to: 51000, by: 1000) {
+        for count in stride(from: 1000, to: 501000, by: 1000) {
             
             // Clear the Registrar and the counter for the PIDs
             Registrar.local.processesLinkedToPid = [:]
