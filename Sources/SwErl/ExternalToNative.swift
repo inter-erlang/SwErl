@@ -186,7 +186,7 @@ extension Data {
             } else {
                 value = Int(asUnsigned)
             }
-            return (value, self.dropFirst(2))
+            return (value, self.dropFirst(1))
         }
     }
 }
@@ -231,7 +231,7 @@ extension Data {
     ///
     /// The format of the external representation is
     /// _______________________________________________________
-    /// bytes |      1    |      4     |   1  |       byteCount       |
+    /// bytes |      1    |         4          |    1   |       byteCount       |
     /// _______________________________________________________
     /// value |     111   |  byteCount | sign | d(0)...d(byteCount-1) |
     /// -------------------------------------------------------
@@ -244,12 +244,9 @@ extension Data {
             }
             let byteCount = Int(self.prefix(4).toMachineByteOrder.toUInt32)
             var reduced = self.dropFirst(4)
-            guard reduced.count >= 1 + byteCount else { // Including the sign byte
-                return nil
-            }
-            let result = BigInt(reduced.prefix(1 + byteCount)) // Includes the sign byte and magnitude
-            reduced = reduced.dropFirst(1 + byteCount)
-            return (result, Data(reduced))
+            let result = BigInt(reduced.prefix(byteCount)) // Includes the sign byte and magnitude
+            reduced = reduced.dropFirst(byteCount)
+            return (result,reduced)
         }
     }
 }
@@ -368,7 +365,7 @@ extension Data {
     /// - Version: 0.1
     var fromStringExt: (String, Data)? {
         get {
-            guard self.count >= 5 else { // At least 5 bytes needed: 1 for tag + 4 for length
+            guard self.count >= 4 else { // At least 5 bytes needed: 1 for tag + 4 for length
                 return nil
             }
             var countBytes = self.prefix(4)
