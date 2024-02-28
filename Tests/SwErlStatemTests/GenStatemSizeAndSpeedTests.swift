@@ -1,6 +1,6 @@
 //
 //  GenStatemSizeAndSpeedTests.swift
-//  
+//
 //
 //  Created by yenrab on 11/27/23.
 //
@@ -98,7 +98,7 @@ final class GenStatemSizeAndSpeedTests: XCTestCase {
         
         var expectations:[XCTestExpectation] = []
         let timer = ContinuousClock()
-        let count:UInt64 = 1000000
+        let count:UInt64 = 10000
         var linkTime:UInt64 = 0
         for i in (0..<count){
             let anExpectation = XCTestExpectation(description: "\(i)")

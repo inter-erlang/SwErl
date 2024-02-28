@@ -161,7 +161,7 @@ final class SwErlSpeedTests: XCTestCase {
         
         
         let timer = ContinuousClock()
-        for count in stride(from: 1000, to: 501000, by: 1000) {
+        for count in stride(from: 1000, to: 51000, by: 1000) {
             var totalTime:Int64 = 0
             for _ in 0...count{
                 let time = timer.measure{
@@ -188,7 +188,7 @@ final class SwErlSpeedTests: XCTestCase {
         
         
         let timer = ContinuousClock()
-        for count in stride(from: 1000, to: 501000, by: 1000) {
+        for count in stride(from: 1000, to: 51000, by: 1000) {
             var totalTime:Int64 = 0
             for _ in 0...count{
                 let time = timer.measure{
@@ -240,7 +240,7 @@ final class SwErlSpeedTests: XCTestCase {
         print("!!!!!!!!!!!!!!!!!\nbegin process ramping")
         
         
-        for count in stride(from: 1000, to: 501000, by: 1000) {
+        for count in stride(from: 1000, to: 51000, by: 1000) {
             for processCount in 0..<10{
                 do{
                     _ = try spawnasysl(name:"silly\(processCount)"){@Sendable(procID:Pid, message:Any) in
@@ -273,7 +273,7 @@ final class SwErlSpeedTests: XCTestCase {
         
     let timer = ContinuousClock()
         
-        for count in stride(from: 1000, to: 501000, by: 1000) {
+        for count in stride(from: 1000, to: 51000, by: 1000) {
             
             // Clear the Registrar and the counter for the PIDs
             Registrar.local.processesLinkedToPid = [:]

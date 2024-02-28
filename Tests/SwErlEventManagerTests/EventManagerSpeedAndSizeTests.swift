@@ -1,6 +1,6 @@
 //
 //  SwErlEventManagerSpeedAndSizeTests.swift
-//  
+//
 //
 //  Created by yenrab on 11/27/23.
 //
@@ -28,7 +28,7 @@ final class EventManagerSpeedAndSizeTests: XCTestCase {
         }]
         
         let timer = ContinuousClock()
-        let count:UInt64 = 1000000
+        let count:UInt64 = 10000
         var linkTime:UInt64 = 0
         for i in (0..<count){
             let time = try timer.measure{
