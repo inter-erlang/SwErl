@@ -244,8 +244,8 @@ extension Data {
             }
             let byteCount = Int(self.prefix(4).toMachineByteOrder.toUInt32)
             var reduced = self.dropFirst(4)
-            let result = BigInt(reduced.prefix(byteCount)) // Includes the sign byte and magnitude
-            reduced = reduced.dropFirst(byteCount)
+            let result = BigInt(reduced.prefix(byteCount+1)) // Includes the sign byte and magnitude
+            reduced = reduced.dropFirst(byteCount+1)
             return (result,reduced)
         }
     }
