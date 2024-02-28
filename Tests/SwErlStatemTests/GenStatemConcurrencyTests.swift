@@ -50,15 +50,17 @@ final class GenStatemConcurrencyTests: XCTestCase {
     }
     
     override func setUp() {
-        Registrar.instance.processesLinkedToName = [:]
-        Registrar.instance.processesLinkedToPid = [:]
-        Registrar.instance.processStates = [:]
+        Registrar.local.processesLinkedToName = [:]
+        Registrar.local.processesLinkedToPid = [:]
+        Registrar.local.processStates = [:]
+        Registrar.local.OTPActorsLinkedToPid = [:]
         pidCounter = ProcessIDCounter()
     }
     override func tearDown() {
-        Registrar.instance.processesLinkedToName = [:]
-        Registrar.instance.processesLinkedToPid = [:]
-        Registrar.instance.processStates = [:]
+        Registrar.local.processesLinkedToName = [:]
+        Registrar.local.processesLinkedToPid = [:]
+        Registrar.local.processStates = [:]
+        Registrar.local.OTPActorsLinkedToPid = [:]
         pidCounter = ProcessIDCounter()
     }
     
@@ -77,9 +79,9 @@ final class GenStatemConcurrencyTests: XCTestCase {
         }
         wait(for: expectations, timeout: 20.0)
         
-        XCTAssertEqual(count, Registrar.instance.processesLinkedToName.count)
-        XCTAssertEqual(count, Registrar.instance.processStates.count)
-        XCTAssertEqual(count, Registrar.instance.processesLinkedToPid.count)
+        XCTAssertEqual(count, Registrar.local.processesLinkedToName.count)
+        XCTAssertEqual(count, Registrar.local.processStates.count)
+        XCTAssertEqual(count, Registrar.local.processesLinkedToPid.count)
     }
     func testConcurrentCall()throws{
         try GenStateM.startLink(name: "called_to", statem: expectationStateM.self, initialData: 3)

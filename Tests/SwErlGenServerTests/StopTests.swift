@@ -26,13 +26,13 @@ final class Stop : XCTestCase {
     func testEmptyQueue() {
         _ = GenServer.unlink("server", "shutdown")
         Thread.sleep(forTimeInterval: 1)
-        XCTAssert(Registrar.instance.processesLinkedToPid.isEmpty , "server ref not removed from pid:type dictionary")
+        XCTAssert(Registrar.local.processesLinkedToPid.isEmpty , "server ref not removed from pid:type dictionary")
 
-        XCTAssert(Registrar.instance.processesLinkedToName.isEmpty, "server ref not removed from name:pid dictionary")
+        XCTAssert(Registrar.local.processesLinkedToName.isEmpty, "server ref not removed from name:pid dictionary")
     }
 }
 
-final class FilledQueueStop: XCTestCase {
+final class RequestAfterShutdown: XCTestCase {
     //NOTE test case only valid when start_link and cast tests succeed.
     //expectations:
     // - Dispatch Queued tasks do not run
@@ -50,20 +50,16 @@ final class FilledQueueStop: XCTestCase {
         resetRegistryAndPIDCounter()
     }
     
-    func testOccupiedQueueCasts() {
+    func testRequestAfterShutdown() {
         // make sure each cast takes place in order
         let Q = DispatchQueue(label: "temp q to ensure things are added in order")
         
         Q.sync { try! GenServer.cast("queue server", "delay") }
         _ = Q.sync { GenServer.unlink("queue server", "shutdown") }
 
-//        Thread.sleep(forTimeInterval: 0.1)
         Q.sync { try! GenServer.cast("queue server", "fulfill") }//error not expected here
         wait(for: [noRun], timeout: 4) //inverted expectation
     }
-//    func testOccupiedQueueCalls() {
-//
-//    }
 }
 
 final class AlreadyRegistered: XCTestCase {

@@ -8,6 +8,7 @@
 import XCTest
 @testable import SwErl
 
+@available(iOS 16.0, *)
 final class EventManagerSpeedAndSizeTests: XCTestCase {
 
     func testEventManagerSize() throws{

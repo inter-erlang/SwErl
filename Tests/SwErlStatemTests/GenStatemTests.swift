@@ -12,8 +12,9 @@ final class SwErlStatemTests: XCTestCase {
 
     override func setUp(){
         // Clear the Registrar and reset the pidCounter
-        Registrar.instance.processesLinkedToName = [:]
-        Registrar.instance.processesLinkedToPid = [:]
+        Registrar.local.processesLinkedToName = [:]
+        Registrar.local.processesLinkedToPid = [:]
+        Registrar.local.OTPActorsLinkedToPid = [:]
         pidCounter = ProcessIDCounter()
         
         //setup case
@@ -66,15 +67,15 @@ final class SwErlStatemTests: XCTestCase {
         }
         
         //put everything in the correct place
-        let (aSerial,aCreation) = pidCounter.next()
-        let OTP_Pid = Pid(id: 0, serial: aSerial, creation: aCreation)
+        let (id,aSerial) = pidCounter.next()
+        let OTP_Pid = Pid(id: id, serial: aSerial, creation: 0)
         let queueToUse = DispatchQueue(label: Pid.to_string(OTP_Pid) ,target: DispatchQueue.global())
         
         //build and link the GenStatemBehavior
         let OTP_Process = SwErlProcess(queueToUse:queueToUse, registrationID: OTP_Pid, OTP_Wrappers: (handleCall,handleCast,unlinked,notify))
         do{
             try Registrar.link(OTP_Process, name: "requester", PID: OTP_Pid)
-            Registrar.instance.processStates[OTP_Pid] = 3
+            Registrar.local.processStates[OTP_Pid] = 3
         }
         catch{
             print("\n\n!!!!!!!! setUp FAILED !!!!!!!!\n\(error)\n\n")
@@ -83,8 +84,9 @@ final class SwErlStatemTests: XCTestCase {
     
     override func tearDown() {
         // Clear the Registrar and reset the pidCounter
-        Registrar.instance.processesLinkedToName = [:]
-        Registrar.instance.processesLinkedToPid = [:]
+        Registrar.local.processesLinkedToName = [:]
+        Registrar.local.processesLinkedToPid = [:]
+        Registrar.local.OTPActorsLinkedToPid = [:]
         pidCounter = ProcessIDCounter()
      }
 
@@ -136,8 +138,8 @@ final class SwErlStatemTests: XCTestCase {
         //Happy path
         let PID = try GenStateM.startLink(name: "someName", statem: TesterStatem.self, initialData: ("bob",13,(22,45)))
         XCTAssertEqual(Pid(id: 0,serial: 2,creation: 0),PID)//the pid's serial should be 2 since the setup pid's serial is 1
-        XCTAssertEqual(PID, Registrar.instance.processesLinkedToName["someName"])
-        let theProcess = Registrar.instance.processesLinkedToPid[PID]!
+        XCTAssertEqual(PID, Registrar.local.processesLinkedToName["someName"])
+        let theProcess = Registrar.local.processesLinkedToPid[PID]!
         XCTAssertEqual(PID,theProcess.registeredPid)
         XCTAssertNil(theProcess.statelessLambda)
         XCTAssertNil(theProcess.syncStatefulLambda)
@@ -145,8 +147,8 @@ final class SwErlStatemTests: XCTestCase {
         XCTAssertNil(theProcess.eventHandlers)
         
         let (_,_,_,_) = theProcess.GenStatemProcessWrappers!
-        XCTAssertNotNil(Registrar.instance.processStates[PID])
-        let (name,age,(weight,height)) = Registrar.instance.processStates[PID] as! (String,Int,(Int,Int))
+        XCTAssertNotNil(Registrar.local.processStates[PID])
+        let (name,age,(weight,height)) = Registrar.local.processStates[PID] as! (String,Int,(Int,Int))
         XCTAssertEqual("bob", name)
         XCTAssertEqual(13, age)
         XCTAssertEqual(22, weight)
@@ -190,8 +192,8 @@ final class SwErlStatemTests: XCTestCase {
         XCTAssertEqual(SwErlPassed.ok, passed)
         XCTAssertNil(response)
         //making sure the registrar was updated correctly
-        XCTAssertNil(Registrar.instance.processesLinkedToName["requester"])
-        XCTAssertNil(Registrar.instance.processesLinkedToPid[Pid(id: 0,serial: 1,creation: 0)])
+        XCTAssertNil(Registrar.local.processesLinkedToName["requester"])
+        XCTAssertNil(Registrar.local.processesLinkedToPid[Pid(id: 0,serial: 1,creation: 0)])
         
     }
     

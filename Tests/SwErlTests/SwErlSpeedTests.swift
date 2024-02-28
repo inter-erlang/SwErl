@@ -8,6 +8,7 @@
 import XCTest
 @testable import SwErl
 
+@available(iOS 16.0, *)
 final class SwErlSpeedTests: XCTestCase {
 
     @available(macOS 13.0, *)
@@ -28,7 +29,7 @@ final class SwErlSpeedTests: XCTestCase {
         var totalTime:Int64 = 0
         for _ in 0..<count{
             let time = try timer.measure{
-                _ = try spawn(function: stateless)
+                _ = try spawnasysl(function: stateless)
             }
             totalTime = totalTime + time.components.attoseconds
         }
@@ -41,10 +42,10 @@ final class SwErlSpeedTests: XCTestCase {
         }
         let timer = ContinuousClock()
         var totalTime:Int64 = 0
-        let count:Int64 = 1000000
+        let count:Int64 = 100000
         for _ in 0..<count{
             let time = try timer.measure{
-                _ = try spawn(initialState: 7, function: syncStateful)
+                _ = try spawnsysf(initialState: 7, function: syncStateful)
             }
             totalTime = totalTime + time.components.attoseconds
         }
@@ -62,7 +63,7 @@ final class SwErlSpeedTests: XCTestCase {
         let count:Int64 = 1000000
         for _ in 0..<count{
             let time = try timer.measure{
-                _ = try spawn(initialState: 7, function: asyncStateful)
+                _ = try spawnasysf(initialState: 7, function: asyncStateful)
             }
             totalTime = totalTime + time.components.attoseconds
         }
@@ -78,9 +79,9 @@ final class SwErlSpeedTests: XCTestCase {
         
         let timer = ContinuousClock()
         var totalTime:Int64 = 0
-        let count:Int64 = 1000000
+        let count:Int64 = 100000
         print("!!!!!!!!!!!!!!!!!!! \nsending \(count) messages to synchronous stateful process")
-        let Pid = try spawn(initialState: 7, function: syncStateful)
+        let Pid = try spawnsysf(initialState: 7, function: syncStateful)
         totalTime = 0
         for _ in 0..<count{
             let time = timer.measure{
@@ -105,7 +106,7 @@ final class SwErlSpeedTests: XCTestCase {
         var totalTime:Int64 = 0
         let count:Int64 = 1000000
         print("sending \(count) messages to stateless process")
-        let Pid = try spawn(function: stateless)
+        let Pid = try spawnasysl(function: stateless)
         
         for _ in 0..<count{
             let time = timer.measure{
@@ -156,7 +157,7 @@ final class SwErlSpeedTests: XCTestCase {
         let stateless = {@Sendable(procName:Pid, message:Any) in
             return
         }
-        _ = try spawn(name:"silly",function: stateless)
+        _ = try spawnasysl(name:"silly",function: stateless)
         
         
         let timer = ContinuousClock()
@@ -183,7 +184,7 @@ final class SwErlSpeedTests: XCTestCase {
         let stateless = {@Sendable(procName:Pid, message:Any) in
             return
         }
-        let Pid = try spawn(function: stateless)
+        let Pid = try spawnasysl(function: stateless)
         
         
         let timer = ContinuousClock()
@@ -215,7 +216,7 @@ final class SwErlSpeedTests: XCTestCase {
         for count in stride(from: 1000, to: 101000, by: 1000) {
             var pids:[Pid] = []
             for _ in 1...count{
-                pids.append(try spawn(function: stateless))
+                pids.append(try spawnasysl(function: stateless))
             }
             //send 10000 messages to random pid
             let Pid = pids.randomElement()!
@@ -242,7 +243,7 @@ final class SwErlSpeedTests: XCTestCase {
         for count in stride(from: 1000, to: 501000, by: 1000) {
             for processCount in 0..<10{
                 do{
-                    _ = try spawn(name:"silly\(processCount)"){@Sendable(procID:Pid, message:Any) in
+                    _ = try spawnasysl(name:"silly\(processCount)"){@Sendable(procID:Pid, message:Any) in
                         return
                     }
                 }
@@ -275,14 +276,14 @@ final class SwErlSpeedTests: XCTestCase {
         for count in stride(from: 1000, to: 501000, by: 1000) {
             
             // Clear the Registrar and the counter for the PIDs
-            Registrar.instance.processesLinkedToPid = [:]
+            Registrar.local.processesLinkedToPid = [:]
             pidCounter = ProcessIDCounter()
             
             var totalTime:Int64 = 0
             for processCount in 1...count {
                 do{
                     let time = try timer.measure{
-                        _ = try spawn(name:"silly\(processCount)"){@Sendable(procID:Pid, message:Any) in
+                        _ = try spawnasysl(name:"silly\(processCount)"){@Sendable(procID:Pid, message:Any) in
                             return
                         }
                     }

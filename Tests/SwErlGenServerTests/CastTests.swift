@@ -57,7 +57,7 @@ final class Cast : XCTestCase {
         let azalea = try! GenServer.startLink(concurrencyServer.self, 0)
         try! GenServer.cast(azalea, "write")
         Thread.sleep(forTimeInterval: 1) //ensure no concurrent read+write on Registrar
-        XCTAssertEqual(1, Registrar.instance.processStates[azalea] as! Int, "cast failed to mutate state")
+        XCTAssertEqual(1, Registrar.local.processStates[azalea] as! Int, "cast failed to mutate state")
     }
 }
 

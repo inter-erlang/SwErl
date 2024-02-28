@@ -25,6 +25,9 @@
 //  Created by Lee Barney on 10/13/23.
 //
 
+
+///All documentation within this file was enhanced with the aid of SwiftDoc Builder, an AI-powered documentation assistant available in the GPT Store.
+
 import Foundation
 
 

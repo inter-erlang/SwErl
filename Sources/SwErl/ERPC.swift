@@ -1,6 +1,6 @@
 //
 //  RPC.swift
-//  
+//
 //
 //Permission is hereby granted, free of charge, to any person obtaining a copy
 //of this software and associated documentation files (the "Software"), to deal
@@ -23,22 +23,28 @@
 //  Created by Lee Barney on 11/20/23.
 //
 
+///Documentation within this file was enhanced with the aid of SwiftDoc Builder, an AI-powered documentation assistant available in the GPT Store.
+
 import Foundation
+import Network
+import Logging
 
 enum ERPC{
-    func cast(node:String,module:String,function:String,parameters:[Any]) {
+    static func cast(node:String,module:String,function:String,parameters:[Any]) {
+    }
+    static func multicast(nodes:[String],module:String,function:String,parameters:[Any]){
         
     }
-    func multicast(nodes:[String],module:String,function:String,parameters:[Any]){
-        
-    }
-    func call(node:String,module:String,function:String,parameters:[Any])->Any{
+    static func call(node:String,module:String,function:String,parameters:[Any])->Any{
         
         return 0
     }
-    func multicall(nodes:[String],module:String,function:String,parameters:[Any])->[Any]{
+    static func multicall(nodes:[String],module:String,function:String,parameters:[Any])->[Any]{
         
         return [0]
     }
 }
+
+//work this end to find out why the other end is failing. What is wrong with the challenge send when SwErl Node is sending challenge? Why does the ping of SwErlNode terminate when the challenge is sent?
+                                                                   
 

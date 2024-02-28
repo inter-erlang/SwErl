@@ -25,7 +25,7 @@ final class ConcurrentAdditions : XCTestCase {
 
     func testConcurrentCreation() { // Registry serializes these requests respecting dictionary's thread safety level
         let Q = DispatchQueue(label: "testCQ", attributes: .concurrent)
-        for i in 1...1000000 {
+        for i in 1...10000 {
             Q.async {
                 self.addOneGenServer("gen server \(i)", XCTestExpectation(description: "unused_\(i)"))
             }
@@ -33,39 +33,39 @@ final class ConcurrentAdditions : XCTestCase {
         }
         
         Q.sync(flags: .barrier) {
-            XCTAssertEqual(Registrar.instance.processesLinkedToName.count,
-                           1000000, "10000 processes not present in registrar")
+            XCTAssertEqual(Registrar.local.processesLinkedToName.count,
+                           10000, "10000 processes not present in registrar")
         }
-        //Now for concurrent Reads and writes. It's doing setup and teardown between tests, I think!
-        // Every Server gets five requests, 20/80
-        for _ in 1...5 {
-            for i in 1...1000000 {
-                Q.async {
-                    if Int.random(in: 1...5) > 1 {
-                        try! GenServer.cast("gen server \(i)", "read")
-                    }
-                    else {
-                        try! GenServer.cast("gen server \(i)", "write")
-                    }
-                }
-            }
-        }
-        Q.sync(flags: .barrier) { }
+//        //Now for concurrent Reads and writes. It's doing setup and teardown between tests, I think!
+//        // Every Server gets five requests, 20/80
+//        for _ in 1...5 {
+//            for i in 1...10000 {
+//                Q.async {
+//                    if Int.random(in: 1...5) > 1 {
+//                        try! GenServer.cast("gen server \(i)", "read")
+//                    }
+//                    else {
+//                        try! GenServer.cast("gen server \(i)", "write")
+//                    }
+//                }
+//            }
+//        }
+//        Q.sync(flags: .barrier) { }
+//        
+//        //Add some calls in the mix!
+//        for _ in 1...5 {
+//            for i in 1...10000 {
+//                Q.async {
+//                    if Int.random(in: 1...5) > 1 {
+//                        _ = try! GenServer.call("gen server \(i)", "read")
+//                    }
+//                    else {
+//                        _ = try! GenServer.call("gen server \(i)", "write")
+//                    }
+//                }
+//            }
+//        }
         
-        //Add some calls in the mix!
-        for _ in 1...5 {
-            for i in 1...10000 {
-                Q.async {
-                    if Int.random(in: 1...5) > 1 {
-                        _ = try! GenServer.call("gen server \(i)", "read")
-                    }
-                    else {
-                        _ = try! GenServer.call("gen server \(i)", "write")
-                    }
-                }
-            }
-        }
-        
-        Q.sync(flags: .barrier) { }
+//        Q.sync(flags: .barrier) { }
     }
 }

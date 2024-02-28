@@ -26,10 +26,10 @@
 
 
 
-/**
- This behavior exists as a base protocol for all non-process SwErl actors.
- Since it is the base, all types of SwErl actors can be accumulated in
- shared data structures without resorting to using Swift's Any BIT (Built In Type).
- */
+
+/// This behavior exists as a base protocol for all non-process SwErl actors. Since it is the base, all types of SwErl actors can be accumulated in shared data structures without resorting to using Swift's `Any` BIT (Built In Type).
+///
+/// - Author: Lee S. Barney
+/// - Version: 0.1
 public protocol OTPActor_behavior{
 }
