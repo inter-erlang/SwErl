@@ -23,7 +23,6 @@ fileprivate extension SwErlProcess {
         self.queue = queue
         self.registeredPid = pid
         self.genServerBehavior = functionality
-        self.asyncStatefulLambda = functionality.handleNotify
     }
 }
 
@@ -64,14 +63,7 @@ public protocol GenServerBehavior: OTPActor_behavior {
     ///         note: You may note that the return of GenServer.call() includes a SwErlpassed enum.
     ///         this is included by the API function GenServer.call()
     static func handleCall(request: Any, data: Any) -> (Any, Any)
-    
-    /// called when a server recieves a message via the messaging operatior, '!'. Bang messages are asyncrhonous, a reply is not sent to the caller.
-    /// - Parameters:
-    ///   - pid: pid of genserver instance
-    ///   - request: message content supplied by the messager
-    ///   - data: current server data of the genserver instance
-    /// - Returns: server data provided to genserver instance in future messages
-    static func handleNotify(pid: Pid, request: Any, data: Any?) -> Any?
+
 }
 
 /// Gen Server API. This static type is used to create and message any and all genserver instances local to this node.

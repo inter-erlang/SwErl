@@ -20,9 +20,6 @@ func resetRegistryAndPIDCounter() {
 }
 
 enum SimpleCastServer : GenServerBehavior {
-    static func handleNotify(pid: Pid, request: Any, data: Any?) -> Any? {
-        return nil
-    }
     static func initializeData(_ state: Any?) -> Any? {
         return state
     }
@@ -41,9 +38,6 @@ enum SimpleCastServer : GenServerBehavior {
 }
 
 enum expectationServer : GenServerBehavior {
-    static func handleNotify(pid: SwErl.Pid, request: Any, data: Any?) -> Any? {
-        return nil
-    }
     static func initializeData(_ state: Any?) -> Any? {
         return state
     }
@@ -70,9 +64,6 @@ enum expectationServer : GenServerBehavior {
 }
 
 enum concurrencyServer : GenServerBehavior {
-    static func handleNotify(pid: SwErl.Pid, request: Any, data: Any?) -> Any? {
-        return nil
-    }
     static func initializeData(_ state: Any?) -> Any? {
         state
     }
