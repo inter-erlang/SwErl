@@ -41,8 +41,5 @@ let package = Package(
         .testTarget(
             name: "SwErlEventManagerTests",
             dependencies: ["SwErl"]),
-        .testTarget(
-            name: "SwErlNodeTests",
-            dependencies: ["SwErl"]),
     ]
 )
