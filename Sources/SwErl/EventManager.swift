@@ -53,7 +53,7 @@ public enum EventManager:OTPActor_behavior{
     ///
     /// - Author: Lee Barney
     /// - Version: 0.1
-    static func link(queueToUse:DispatchQueue = .global(),name:String,intialHandlers:[SwErlStatelessHandler]) throws -> Pid{
+    @discardableResult public static func link(queueToUse:DispatchQueue = .global(),name:String,intialHandlers:[SwErlStatelessHandler]) throws -> Pid{
         //register the actor by name.
         let PID = Registrar.generatePid()
         let queueToUse = DispatchQueue(label: Pid.to_string(PID) ,target: queueToUse)
@@ -70,7 +70,7 @@ public enum EventManager:OTPActor_behavior{
     ///
     /// - Author: Lee Barney
     /// - Version: 0.1
-    static func unlink(name:String){
+    public static func unlink(name:String){
         
         guard let PID = Registrar.getPid(forName: name) else{
             return//Quiely fail since the statem was not registered
@@ -94,13 +94,13 @@ public enum EventManager:OTPActor_behavior{
     ///
     /// - Author: Lee Barney
     /// - Version: 0.1
-    static func notify(name:String,message:SwErlMessage){
+    public static func notify(name:String,message:SwErlMessage){
         guard let PID = Registrar.getPid(forName:name) else{
             return//silently fail. No such event manager
         }
         notify(PID: PID,message: message)
     }
-    static func notify(PID:Pid,message:SwErlMessage){
+    public static func notify(PID:Pid,message:SwErlMessage){
         guard let eventManagerProcess = Registrar.getProcess(forID: PID) else{
             return//silently fail. No such event manager registered
         }

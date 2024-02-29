@@ -31,50 +31,50 @@ import Foundation
 public protocol GenStatemBehavior:OTPActor_behavior{
     
     
-///     This hook function is called if the ! operator is used to send a message to a _statem\_behavior_.
-///     - Parameters:
-///      - message: any data type sent as a message to the PID's state machine
-///      - state: the current state of the state machine
-///     - Value: none
-///     - Author:
-///     Lee S. Barney
-///     - Version:
-///     0.1
-     
+    ///     This hook function is called if the ! operator is used to send a message to a _statem\_behavior_.
+    ///     - Parameters:
+    ///      - message: any data type sent as a message to the PID's state machine
+    ///      - state: the current state of the state machine
+    ///     - Value: none
+    ///     - Author:
+    ///     Lee S. Barney
+    ///     - Version:
+    ///     0.1
+    
     static func notify(message: SwErl.SwErlMessage, state: SwErl.SwErlState)
     
-///     This hook function is used to create the first state of this state machine subtype's occurance.
-///     - Parameters:
-///     - initialData: the data used to generate an initial state.
-///     - Value: The state to be used as the initial state of the state machine subtype's occurance
-///     - Throws: any exception thrown by the code implementation of this function
-///     - Author:
-///     Lee S. Barney
-///     - Version:
-///     0.1
+    ///     This hook function is used to create the first state of this state machine subtype's occurance.
+    ///     - Parameters:
+    ///     - initialData: the data used to generate an initial state.
+    ///     - Value: The state to be used as the initial state of the state machine subtype's occurance
+    ///     - Throws: any exception thrown by the code implementation of this function
+    ///     - Author:
+    ///     Lee S. Barney
+    ///     - Version:
+    ///     0.1
     static func initialize(initialData:Any) ->SwErlState
     
-///    This hook function is used to react to a request to unlink request. At this point, when this function executes, the machine sub-type's occurance has already been unlinked.
-///     - Parameters:
-///     - reason: the reason given in the request to unlink the occurance
-///     - current_state:
-///     - Value: void
-///     - Throws: any exception thrown by the code implementation of this function
-///     - Author:
-///     Lee S. Barney
-///     - Version:
-///     0.1
+    ///    This hook function is used to react to a request to unlink request. At this point, when this function executes, the machine sub-type's occurance has already been unlinked.
+    ///     - Parameters:
+    ///     - reason: the reason given in the request to unlink the occurance
+    ///     - current_state:
+    ///     - Value: void
+    ///     - Throws: any exception thrown by the code implementation of this function
+    ///     - Author:
+    ///     Lee S. Barney
+    ///     - Version:
+    ///     0.1
     static func unlinked(message:SwErlMessage,current_state:SwErlState)
     
-///    This hook function is used to deal with the results of using the _gen\_statem.cast_ function. The logic it executes calculates an updated state for the state machine.
-///     - Parameters:
-///     - message: any data or data structure
-///     - current_state: the existing state of the state machine
-///     - Value: an updated state that is the result of receiving the message or nil
-///     - Author:
-///     Lee S. Barney
-///     - Version:
-///     0.1
+    ///    This hook function is used to deal with the results of using the _gen\_statem.cast_ function. The logic it executes calculates an updated state for the state machine.
+    ///     - Parameters:
+    ///     - message: any data or data structure
+    ///     - current_state: the existing state of the state machine
+    ///     - Value: an updated state that is the result of receiving the message or nil
+    ///     - Author:
+    ///     Lee S. Barney
+    ///     - Version:
+    ///     0.1
     static func handleCast(message:SwErlMessage,current_state:SwErlState)->SwErlState
     static func handleCall(message:SwErlMessage,current_state:SwErlState)->(SwErlResponse,SwErlState)
     
@@ -92,18 +92,18 @@ public protocol GenStatemBehavior:OTPActor_behavior{
 /// properly so it can be used from anywhere in the application's code base.
 public enum GenStateM:OTPActor_behavior{
     
-///    This function registers, by name, and prepares an occurance of a specified sub-type of a generic state machine using the specified data. Once this function completes, the sub-type occurance can be used. All functions applied to the occurance will execute on the main or any other thread depending on the DispatchQueue stated. By default, the global queue will be used, but if the main() queue is passed as a parameter, the sub-type's functions will all run on the main/UI thread.
-///     - Parameters:
-///      - queueToUse: the desired queue for the processes should use. Default:main()
-///      - name: a name to link to an occurance of the statem sub-type.
-///      - statem: the sub-type of statem being linked to.
-///      - initialData: any desired data used to initialize the statem sub-type occurance's state. This data is passsed to the statem sub-type's initialize function.
-///     - Value: a Pid that uniquely identifies the occurance of the sub-type of gen\_statem the name is linked to
-///     - Author:
-///     Lee S. Barney
-///     - Version:
-///     0.1
-    @discardableResult static func startLink<T:GenStatemBehavior>(queueToUse:DispatchQueue = DispatchQueue.global(),name:String,statem:T.Type,initialData:Any) throws -> Pid{
+    ///    This function registers, by name, and prepares an occurance of a specified sub-type of a generic state machine using the specified data. Once this function completes, the sub-type occurance can be used. All functions applied to the occurance will execute on the main or any other thread depending on the DispatchQueue stated. By default, the global queue will be used, but if the main() queue is passed as a parameter, the sub-type's functions will all run on the main/UI thread.
+    ///     - Parameters:
+    ///      - queueToUse: the desired queue for the processes should use. Default:main()
+    ///      - name: a name to link to an occurance of the statem sub-type.
+    ///      - statem: the sub-type of statem being linked to.
+    ///      - initialData: any desired data used to initialize the statem sub-type occurance's state. This data is passsed to the statem sub-type's initialize function.
+    ///     - Value: a Pid that uniquely identifies the occurance of the sub-type of gen\_statem the name is linked to
+    ///     - Author:
+    ///     Lee S. Barney
+    ///     - Version:
+    ///     0.1
+    @discardableResult public static func startLink<T:GenStatemBehavior>(queueToUse:DispatchQueue = DispatchQueue.global(),name:String,statem:T.Type,initialData:Any) throws -> Pid{
         
         //generate the pid prior to the pids for the behavior closures
         let OTP_Pid = Registrar.generatePid()
@@ -129,24 +129,24 @@ public enum GenStateM:OTPActor_behavior{
         }
         
         let statemProcess = SwErlProcess(queueToUse:serialQueue, registrationID: OTP_Pid, OTP_Wrappers: (handleCall,handleCast,unlinked,notify))
-       
+        
         let state = statem.initialize(initialData: initialData)
         try Registrar.link(statemProcess, initState:state, name: name, PID: OTP_Pid)
         return OTP_Pid
     }
     
-///    This function registers, by name, and prepares an occurance of a specified sub-type of a generic state machine using the specified data. Once this function completes, the sub-type occurance can be used. All functions applied to the occurance will execute on the main or any other thread depending on the DispatchQueue stated. By default, the global queue will be used, but if the main() queue is passed as a parameter, the sub-type's functions will all run on the main/UI thread.
-///     - Parameters:
-///      - queueToUse: the desired queue for the processes should use. Default:main()
-///      - name: a name to link to an occurance of the statem sub-type.
-///      - statem: the sub-type of statem being linked to.
-///      - initialData: any desired data used to initialize the statem sub-type occurance's state. This data is passsed to the statem sub-type's initialize function.
-///     - Value: a Pid that uniquely identifies the occurance of the sub-type of gen\_statem the name is linked to
-///     - Author:
-///     Lee S. Barney
-///     - Version:
-///     0.1
-    @discardableResult static func startLinkGlobally<T:GenStatemBehavior>(queueToUse:DispatchQueue = DispatchQueue.global(),name:String,statem:T.Type,initialData:Any) throws -> Pid{
+    ///    This function registers, by name, and prepares an occurance of a specified sub-type of a generic state machine using the specified data. Once this function completes, the sub-type occurance can be used. All functions applied to the occurance will execute on the main or any other thread depending on the DispatchQueue stated. By default, the global queue will be used, but if the main() queue is passed as a parameter, the sub-type's functions will all run on the main/UI thread.
+    ///     - Parameters:
+    ///      - queueToUse: the desired queue for the processes should use. Default:main()
+    ///      - name: a name to link to an occurance of the statem sub-type.
+    ///      - statem: the sub-type of statem being linked to.
+    ///      - initialData: any desired data used to initialize the statem sub-type occurance's state. This data is passsed to the statem sub-type's initialize function.
+    ///     - Value: a Pid that uniquely identifies the occurance of the sub-type of gen\_statem the name is linked to
+    ///     - Author:
+    ///     Lee S. Barney
+    ///     - Version:
+    ///     0.1
+    @discardableResult public static func startLinkGlobally<T:GenStatemBehavior>(queueToUse:DispatchQueue = DispatchQueue.global(),name:String,statem:T.Type,initialData:Any) throws -> Pid{
         
         //generate the pid prior to the pids for the behavior closures
         let (id, aSerial) = pidCounter.next()
@@ -179,20 +179,20 @@ public enum GenStateM:OTPActor_behavior{
         return OTP_Pid
     }
     
-///    This function unlinks the information of an occurance of a generic state machine's sub-type. When the state machine is unlinked, all data memory for the state machine is freed. Other occurances of the sub-type registered under other names are unaffected.
-///
-///     After the name and Pid have been unlinked, the state machine sub-type's unlink function is called.
-///
-///     If the name parameter does not match a linked occurance of a state machine sub-type, nothing needs to be unlinked and the state of the application is still valid. Therefore, no exceptions are thrown.
-///     - Parameters:
-///      - name: a name of a registered occurance of a GenSatemBehavior sub-type occurance.
-///      - message: any data to be logged, printed, or used in the state machine's unlink function.
-///     - Value: SwErlResponse indicating success, ok, or failure, fail, and a failure reason.
-///     - Author:
-///     Lee S. Barney
-///     - Version:
-///     0.1
-    static func unlink(name:String, message:SwErlMessage)->SwErlResponse{
+    ///    This function unlinks the information of an occurance of a generic state machine's sub-type. When the state machine is unlinked, all data memory for the state machine is freed. Other occurances of the sub-type registered under other names are unaffected.
+    ///
+    ///     After the name and Pid have been unlinked, the state machine sub-type's unlink function is called.
+    ///
+    ///     If the name parameter does not match a linked occurance of a state machine sub-type, nothing needs to be unlinked and the state of the application is still valid. Therefore, no exceptions are thrown.
+    ///     - Parameters:
+    ///      - name: a name of a registered occurance of a GenSatemBehavior sub-type occurance.
+    ///      - message: any data to be logged, printed, or used in the state machine's unlink function.
+    ///     - Value: SwErlResponse indicating success, ok, or failure, fail, and a failure reason.
+    ///     - Author:
+    ///     Lee S. Barney
+    ///     - Version:
+    ///     0.1
+    public static func unlink(name:String, message:SwErlMessage)->SwErlResponse{
         guard let PID = Registrar.local.processesLinkedToName[name] else{
             return (SwErlPassed.fail,SwErlError.notRegisteredByName)
         }
@@ -213,26 +213,26 @@ public enum GenStateM:OTPActor_behavior{
         }
     }
     
-///    This function sends a concurrent message to a registered occurance of a generic state machine sub-type. Messages are used to update the state of the state machine as defined in the state machine sub-type's handleCast function.
-///     - Parameters:
-///     - name: a name of a registered occurance of a statem sub-type occurance.
-///     - message: any type of data expected by the handleCast function of the generic state machine's sub-type.
-///     - Value: Void
-///     - Author:
-///     Lee S. Barney
-///     - Version:
-///     0.1
+    ///    This function sends a concurrent message to a registered occurance of a generic state machine sub-type. Messages are used to update the state of the state machine as defined in the state machine sub-type's handleCast function.
+    ///     - Parameters:
+    ///     - name: a name of a registered occurance of a statem sub-type occurance.
+    ///     - message: any type of data expected by the handleCast function of the generic state machine's sub-type.
+    ///     - Value: Void
+    ///     - Author:
+    ///     Lee S. Barney
+    ///     - Version:
+    ///     0.1
     
     //being a cast-type call, no value is expected and all no failures throw
     //directly from these functions.
-    static func cast(name:String,message:SwErlMessage){
+    public static func cast(name:String,message:SwErlMessage){
         guard let PID = Registrar.local.processesLinkedToName[name] else{
             return
         }
         cast(PID:PID,message: message)
     }
     
-    static func cast(PID:Pid,message:SwErlMessage){
+    public static func cast(PID:Pid,message:SwErlMessage){
         //don't wait for a return
         //it doesn't matter which queue is used here. This is not the queue
         //on which the processing will happen
@@ -255,22 +255,22 @@ public enum GenStateM:OTPActor_behavior{
     }
     
     
-///    This function sends a concurrent, non-blocking message to a registered occurance of a generic state machine sub-type. No updates to the state machine's state are done.
-///     - Parameters:
-///      - name: a name of a registered occurance of a statem sub-type occurance.
-///      - message: any type of data expected by the handleCast function of the generic state machine's sub-type.
-///     - Value: Void
-///     - Author:
-///     Lee S. Barney
-///     - Version:
-///     0.1
-    static func notify(name:String,message:SwErlMessage){
+    ///    This function sends a concurrent, non-blocking message to a registered occurance of a generic state machine sub-type. No updates to the state machine's state are done.
+    ///     - Parameters:
+    ///      - name: a name of a registered occurance of a statem sub-type occurance.
+    ///      - message: any type of data expected by the handleCast function of the generic state machine's sub-type.
+    ///     - Value: Void
+    ///     - Author:
+    ///     Lee S. Barney
+    ///     - Version:
+    ///     0.1
+    public static func notify(name:String,message:SwErlMessage){
         guard let PID = Registrar.local.processesLinkedToName[name] else{
             return
         }
         notify(PID:PID,message: message)
     }
-    static func notify(PID:Pid,message:SwErlMessage){
+    public static func notify(PID:Pid,message:SwErlMessage){
         DispatchQueue.global().async {
             //if the pid hasn't been registered correctly, return.
             guard let process = Registrar.local.processesLinkedToPid[PID] else{
@@ -288,40 +288,40 @@ public enum GenStateM:OTPActor_behavior{
         }
     }
     
-///    This function sends a message to a registered occurance of a generic state machine sub-type and waits for a response. Messages are used to update the state of the state machine as defined in the state machine sub-type's handleCall function.
-///     - Parameters:
-///     - name: a name of a registered occurance of a statem sub-type occurance.
-///     - message: any type of data expected by the handleEvent function of the generic state machine's sub-type.
-///     - Value: A SwErlResponse, (SwErlSuccess.ok,Data) or (SwErlSuccess.fail,Data), which is returned from the state machine sub-type's handleCall function.
-///     - Author:
-///     Lee S. Barney
-///     - Version:
-///     0.1
-    static func call(name:String,message:SwErlMessage)->SwErlResponse{
+    ///    This function sends a message to a registered occurance of a generic state machine sub-type and waits for a response. Messages are used to update the state of the state machine as defined in the state machine sub-type's handleCall function.
+    ///     - Parameters:
+    ///     - name: a name of a registered occurance of a statem sub-type occurance.
+    ///     - message: any type of data expected by the handleEvent function of the generic state machine's sub-type.
+    ///     - Value: A SwErlResponse, (SwErlSuccess.ok,Data) or (SwErlSuccess.fail,Data), which is returned from the state machine sub-type's handleCall function.
+    ///     - Author:
+    ///     Lee S. Barney
+    ///     - Version:
+    ///     0.1
+    public static func call(name:String,message:SwErlMessage)->SwErlResponse{
         guard let PID = Registrar.local.processesLinkedToName[name] else{
             return (SwErlPassed.fail,SwErlError.notRegisteredByName)
         }
         return call(PID:PID,message: message)
     }
-        static func call(PID:Pid, message:SwErlMessage)->SwErlResponse{
-            //if the pid hasn't been registered correctly, throw an exception.
-            guard let process = Registrar.local.processesLinkedToPid[PID] else{
-                return (SwErlPassed.fail,SwErlError.notRegisteredByPid)
-            }
-            return process.queue.sync{//blocks until complete 😕
-                //state machines always have a stored state.
-                //if this one doesn't, do nothing.
-                guard let state = Registrar.local.processStates[PID] else{
-                    return (SwErlPassed.fail,SwErlError.statem_behaviorWithoutState)
-                }
-                guard let (handleCall,_,_,_) = process.GenStatemProcessWrappers else{
-                    return (SwErlPassed.fail,"no handleCall function found")
-                }
-                let (response,updatedState) = handleCall(message,state)
-                Registrar.local.processStates[PID] = updatedState
-                return response
-            }
+    public static func call(PID:Pid, message:SwErlMessage)->SwErlResponse{
+        //if the pid hasn't been registered correctly, throw an exception.
+        guard let process = Registrar.local.processesLinkedToPid[PID] else{
+            return (SwErlPassed.fail,SwErlError.notRegisteredByPid)
         }
+        return process.queue.sync{//blocks until complete 😕
+            //state machines always have a stored state.
+            //if this one doesn't, do nothing.
+            guard let state = Registrar.local.processStates[PID] else{
+                return (SwErlPassed.fail,SwErlError.statem_behaviorWithoutState)
+            }
+            guard let (handleCall,_,_,_) = process.GenStatemProcessWrappers else{
+                return (SwErlPassed.fail,"no handleCall function found")
+            }
+            let (response,updatedState) = handleCall(message,state)
+            Registrar.local.processStates[PID] = updatedState
+            return response
+        }
+    }
 }
 
 

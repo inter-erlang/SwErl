@@ -80,7 +80,7 @@ public enum SafeDictCommand {
 ///
 /// - Author: Lee Barney
 /// - Version: 0.1
-func buildSafe<K, V>(dictionary: [K: V], named: String) throws {
+public func buildSafe<K, V>(dictionary: [K: V], named: String) throws {
     try spawnsysf(name: named, initialState: dictionary) { Pid, message, state in
         guard var rawDictionary = state as? [K: V] else {
             return ((SwErlPassed.fail, SwErlError.invalidState), [K: V]())

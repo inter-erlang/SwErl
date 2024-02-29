@@ -120,7 +120,7 @@ public enum GenServer {
         ///   - type: The `GenServerBehavior` conforming type of which to create an instance.
         ///   - initialState: Initial data provided to the `GenServerBehavior`'s `.initializeData` function.
         /// - Returns: The registered name of the newly created `GenServer` upon success, or a `SwErlError` on failure.
-    @discardableResult static func startLink<T: GenServerBehavior>(
+    @discardableResult public static func startLink<T: GenServerBehavior>(
         queueEndpoint: DispatchQueue = DispatchQueue.global(),
         _ name: String, _ type: T.Type, _ initialState: Any?) throws -> String {
             let pid = Registrar.generatePid()
@@ -145,7 +145,7 @@ public enum GenServer {
     ///   - type: The `GenServerBehavior` conforming type of which to create an instance.
     ///   - initialState: Initial data provided to the `GenServerBehavior`'s `.initializeData` function.
     /// - Returns: The PID of the newly created `GenServer` upon success, or a `SwErlError` on failure.
-    @discardableResult static func startLink<T: GenServerBehavior>(
+    @discardableResult public static func startLink<T: GenServerBehavior>(
     queueEndpoint: DispatchQueue = DispatchQueue.global(),
     _ type: T.Type, _ initialState: Any?) throws -> Pid {
         let pid = Registrar.generatePid()
@@ -168,14 +168,14 @@ public enum GenServer {
     /// - Parameters:
     ///   - name: The registered name of the `GenServerBehavior` instance.
     ///   - message: The message to send.
-    static func notify(_ name: String, _ message: SwErlMessage) {
+    public static func notify(_ name: String, _ message: SwErlMessage) {
         name ! message
     }
     /// Sends a message to a `GenServerBehavior` instance identified by its PID.
     /// - Parameters:
     ///   - pid: The PID of the `GenServer`.
     ///   - message: The message to send.
-    static func notify(_ pid: Pid, _ message: SwErlMessage) {
+    public static func notify(_ pid: Pid, _ message: SwErlMessage) {
         pid ! message
     }
     
@@ -186,7 +186,7 @@ public enum GenServer {
     /// - Returns: A tuple indicating the result of the operation and any relevant error.
     ///     on fail: (SwErlPassed.fail, SwErlError)
     ///     on success: (SwErlPassed.ok, nil)
-    static func unlink(_ name: String, _ reason: String) -> SwErlResponse{
+    public static func unlink(_ name: String, _ reason: String) -> SwErlResponse{
         guard let pid = Registrar.getPid(forName: name) else {
             return (SwErlPassed.fail, SwErlError.notRegisteredByName)
         }
@@ -215,7 +215,7 @@ public enum GenServer {
     /// - Returns: A tuple indicating the result of the operation and any relevant error.
     ///     on fail: (SwErlPassed.fail, SwErlError)
     ///     on success: (SwErlPassed.ok, nil)
-    static func unlink(_ pid: Pid, _ reason: String) -> SwErlResponse {
+    public static func unlink(_ pid: Pid, _ reason: String) -> SwErlResponse {
         guard let process = Registrar.getProcess(forID: pid) else {
             return (SwErlPassed.fail, SwErlError.notRegisteredByPid)
         }
@@ -238,7 +238,7 @@ public enum GenServer {
     /// - Parameters:
     ///   - name: The registered name of the `GenServerBehavior`.
     ///   - message: The message content.
-    static func cast(_ name: String, _ message: Any) throws {
+    public static func cast(_ name: String, _ message: Any) throws {
         guard let pid = Registrar.getPid(forName: name) else {
             throw SwErlError.notRegisteredByName
         }
@@ -248,7 +248,7 @@ public enum GenServer {
     /// - Parameters:
     ///   - id: The PID of the `GenServerBehavior`.
     ///   - message: The message content.
-    static func cast(_ id: Pid, _ message: Any) throws {
+    public static func cast(_ id: Pid, _ message: Any) throws {
         guard let process = Registrar.getProcess(forID: id) else {
             throw SwErlError.notGenServer_behavior
         }
@@ -286,7 +286,7 @@ public enum GenServer {
     /// - Returns: A tuple indicating the success or failure of the operation and the reply or error.
     ///     on fail: (SwerlPassed.fail, SwErlError)
     ///     on success: (SwErlPassed.ok, Any)
-    static func call(_ name: String, _ message: Any) throws  -> SwErlResponse {
+    public static func call(_ name: String, _ message: Any) throws  -> SwErlResponse {
         guard let pid = Registrar.getPid(forName: name) else {
             throw SwErlError.notRegisteredByName
         }
@@ -300,7 +300,7 @@ public enum GenServer {
     /// - Returns: A tuple indicating the success or failure of the operation and the reply or error.
     ///     on fail: (SwerlPassed.fail, SwErlError)
     ///     on success: (SwErlPassed.ok, Any)
-    static func call(_ id: Pid, _ message: Any) throws -> SwErlResponse {
+    public static func call(_ id: Pid, _ message: Any) throws -> SwErlResponse {
         guard let process = Registrar.getProcess(forID: id) else {
             throw SwErlError.notGenServer_behavior
         }
