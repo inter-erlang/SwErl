@@ -31,32 +31,28 @@
 import Foundation
 
 
-/**
- This enumeration has, as elements, a set of generic functions that conduct
- the communication required of all _EventManager_s. These functions ensure
- that the hook functions in each custom event handler are executed in the
- correct order and store updated states correctly.
- 
- These functions also ensure that all event handlers added to this manager are notified
- each time the manager receives an notification of an event.
- 
- These functions also ensure that each custom event manager is registered
- properly so it can be used from anywhere in the application's code base.
- */
+/// Enumeration containing a set of generic functions responsible for managing communication within _EventManager_s. These functions are designed to:
+/// - Ensure the correct sequential execution of hook functions in custom event handlers.
+/// - Properly store updated states after each event handling.
+/// - Notify all event handlers associated with the manager upon receiving an event notification.
+/// - Register each custom event manager appropriately for global accessibility within the application's code base.
+///
+/// These mechanisms are fundamental to maintaining the integrity and order of event handling and state management across different parts of the application, facilitating a consistent and reliable event-driven architecture.
+
 public enum EventManager:OTPActor_behavior{
     
-    /**
-     This function registers, by name, and prepares a specified event manager using a list, possibly empty, of SwErl stateful or stateless process' IDs. These processes are the handlers for the event managed by the manager. Once this function completes, the occurrance can be used. All functions applied to the occurrance will execute on the main or any other thread depending on the DispatchQueue stated. By default, the global queue will be used, but if the main() queue is passed as a parameter, the occurrance's functions will all run on the main/UI thread.
-     - Parameters:
-     - queueToUse: the desired queue the processes should use. Default:global()
-     - name: a name to link to an occurrance of the statem sub-type.
-     - initial_data: any desired data used to initialize the statem sub-type occurrance's state
-     - Value: a Pid that uniquely identifies the occurrance of the sub-type of gen\_statem the name is linked to
-     - Author:
-     Lee S. Barney
-     - Version:
-     0.1
-     */
+    /// Registers and prepares a specified event manager with a given name, associating it with a list of SwErl process IDs. These processes act as handlers for events managed by the event manager. Post-registration, the occurrence can be utilized for event handling, with all related function executions occurring on either the main or a specified thread based on the provided `DispatchQueue`. By default, operations use the global queue, but specifying `DispatchQueue.main()` directs execution to the main/UI thread.
+    ///
+    /// - Parameters:
+    ///   - queueToUse: The dispatch queue on which the processes will execute. Defaults to the global queue.
+    ///   - name: A unique name to associate with an occurrence of the state management subtype.
+    ///   - initialHandlers: An array of SwErl stateful or stateless process IDs that will handle events.
+    /// - Returns: A `Pid` that uniquely identifies the occurrence of the state management subtype linked to the given name.
+    ///
+    /// - Complexity: O(1) for registration and setup. Actual complexity for event handling will depend on the implementation of the handlers.
+    ///
+    /// - Author: Lee Barney
+    /// - Version: 0.1
     static func link(queueToUse:DispatchQueue = .global(),name:String,intialHandlers:[SwErlStatelessHandler]) throws -> Pid{
         //register the actor by name.
         let PID = Registrar.generatePid()
@@ -65,19 +61,15 @@ public enum EventManager:OTPActor_behavior{
         try Registrar.link(process, name: name, PID: PID)
         return PID
     }
-    /**
-     This function unlinks the information of an occurrance of an event manager. Other occurrances of the sub-type registered under other names are unaffected.
-     
-     
-     If the name does not match a linked occurrance of an event manager, nothing needs to be unlinked and the state of the application is still valid. Therefore, no exceptions are thrown.
-     - Parameters:
-     - name: a name of a registered occurrance of a statem sub-type occurrance.
-     - Value: void
-     - Author:
-     Lee S. Barney
-     - Version:
-     0.1
-     */
+    /// Unlinks the information of an occurrence of an event manager. This operation does not affect other occurrences of the sub-type registered under different names. If the specified name does not match any linked occurrence of an event manager, the application's state remains valid, and no exceptions are thrown, resulting in a quiet failure.
+    ///
+    /// - Parameters:
+    ///   - name: The name of a registered occurrence of a state management (statem) sub-type.
+    ///
+    /// - Complexity: O(1), as unlinking is a direct operation involving lookup and removal from the registry.
+    ///
+    /// - Author: Lee Barney
+    /// - Version: 0.1
     static func unlink(name:String){
         
         guard let PID = Registrar.getPid(forName: name) else{
@@ -92,17 +84,16 @@ public enum EventManager:OTPActor_behavior{
         Registrar.unlink(name)
     }
     
-    /**
-     This function sends a concurrent, non-blocking message to a registered occurance of an event manager. No updates to the state machine's state are done.
-     - Parameters:
-      - name: a name of a registered occurance of an event manager occurance.
-      - message: any type of data expected by the manager's event handler functions.
-     - Value: Void
-     - Author:
-     Lee S. Barney
-     - Version:
-     0.1
-     */
+    /// Sends a concurrent, non-blocking message to a registered occurrence of an event manager. This function does not perform any updates to the state machine's state.
+    ///
+    /// - Parameters:
+    ///   - name: The name of a registered occurrence of an event manager.
+    ///   - message: The data expected by the event manager's handler functions. Can be of any type.
+    ///
+    /// - Complexity: O(1), as sending a message is a direct operation that does not involve state manipulation.
+    ///
+    /// - Author: Lee Barney
+    /// - Version: 0.1
     static func notify(name:String,message:SwErlMessage){
         guard let PID = Registrar.getPid(forName:name) else{
             return//silently fail. No such event manager
@@ -117,6 +108,15 @@ public enum EventManager:OTPActor_behavior{
         guard let handlers = eventManagerProcess.eventHandlers else{
             return//silently fail. Not an event handler
         }
+        for handler in handlers {
+            eventManagerProcess.queue.async {
+                handler(PID,message)
+            }
+        }
+        
+    }
+    
+}
         for handler in handlers {
             eventManagerProcess.queue.async {
                 handler(PID,message)
