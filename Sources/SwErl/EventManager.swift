@@ -117,12 +117,3 @@ public enum EventManager:OTPActor_behavior{
     }
     
 }
-        for handler in handlers {
-            eventManagerProcess.queue.async {
-                handler(PID,message)
-            }
-        }
-        
-    }
-    
-}
