@@ -966,6 +966,22 @@ struct Registrar{
         }
     }
     
+    /// Removes the state associated with a specific process identified by its `Pid`. This operation is synchronized to ensure thread safety, particularly when manipulating the process state storage.
+    ///
+    /// This function is typically called when a process is terminated or when its state needs to be explicitly cleared from the system. The removal is performed within a synchronous block on a designated queue to maintain consistency and prevent race conditions.
+    ///
+    /// - Parameter forID: The `Pid` of the process whose state is to be removed.
+    ///
+    /// - Complexity: O(1)
+    ///
+    /// - Author: Lee Barney
+    /// - Version: 0.1
+    static func removeState(forID:Pid){
+        _ = queue.sync{
+            local.processStates.removeValue(forKey: forID)
+        }
+    }
+    
     /// Provides access to an OTP Actor process by `Pid`.
     ///
     /// - Parameters:

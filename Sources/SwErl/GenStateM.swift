@@ -193,24 +193,22 @@ public enum GenStateM:OTPActor_behavior{
     ///     - Version:
     ///     0.1
     public static func unlink(name:String, message:SwErlMessage)->SwErlResponse{
-        guard let PID = Registrar.local.processesLinkedToName[name] else{
+        guard let PID = Registrar.getPid(forName: name) else{
             return (SwErlPassed.fail,SwErlError.notRegisteredByName)
         }
-        guard let process = Registrar.local.processesLinkedToPid[PID] else{
+        guard let process = Registrar.getProcess(forID: PID) else{
             return (SwErlPassed.fail,SwErlError.notRegisteredByPid)
         }
         guard let (_,_,unlinked,_) = process.GenStatemProcessWrappers else{
             return (SwErlPassed.fail," \(name) has no unlinked function")
         }
-        return process.queue.sync{
-            Registrar.unlink(name)
-            guard let state = Registrar.getProcessState(forID: PID) else{
-                return (SwErlPassed.fail,SwErlError.invalidState)
-            }
-            Registrar.local.processStates.removeValue(forKey: PID)
-            let(response,_) = unlinked(message,state)
-            return response
+        Registrar.unlink(name)
+        guard let state = Registrar.getProcessState(forID: PID) else{
+            return (SwErlPassed.fail,SwErlError.invalidState)
         }
+        Registrar.removeState(forID: PID)
+        let(response,_) = unlinked(message,state)
+        return response
     }
     
     ///    This function sends a concurrent message to a registered occurance of a generic state machine sub-type. Messages are used to update the state of the state machine as defined in the state machine sub-type's handleCast function.
@@ -226,7 +224,7 @@ public enum GenStateM:OTPActor_behavior{
     //being a cast-type call, no value is expected and all no failures throw
     //directly from these functions.
     public static func cast(name:String,message:SwErlMessage){
-        guard let PID = Registrar.local.processesLinkedToName[name] else{
+        guard let PID = Registrar.getPid(forName: name) else{
             return
         }
         cast(PID:PID,message: message)
@@ -264,7 +262,7 @@ public enum GenStateM:OTPActor_behavior{
     ///     - Version:
     ///     0.1
     public static func notify(name:String,message:SwErlMessage){
-        guard let PID = Registrar.local.processesLinkedToName[name] else{
+        guard let PID = Registrar.getPid(forName: name) else{
             return
         }
         notify(PID:PID,message: message)
@@ -272,7 +270,7 @@ public enum GenStateM:OTPActor_behavior{
     public static func notify(PID:Pid,message:SwErlMessage){
         DispatchQueue.global().async {
             //if the pid hasn't been registered correctly, return.
-            guard let process = Registrar.local.processesLinkedToPid[PID] else{
+            guard let process = Registrar.getProcess(forID: PID) else{
                 return
             }
             process.queue.sync {
@@ -297,14 +295,14 @@ public enum GenStateM:OTPActor_behavior{
     ///     - Version:
     ///     0.1
     public static func call(name:String,message:SwErlMessage)->SwErlResponse{
-        guard let PID = Registrar.local.processesLinkedToName[name] else{
+        guard let PID = Registrar.getPid(forName: name) else{
             return (SwErlPassed.fail,SwErlError.notRegisteredByName)
         }
         return call(PID:PID,message: message)
     }
     public static func call(PID:Pid, message:SwErlMessage)->SwErlResponse{
         //if the pid hasn't been registered correctly, throw an exception.
-        guard let process = Registrar.local.processesLinkedToPid[PID] else{
+        guard let process = Registrar.getProcess(forID: PID) else{
             return (SwErlPassed.fail,SwErlError.notRegisteredByPid)
         }
         return process.queue.sync{//blocks until complete 😕
