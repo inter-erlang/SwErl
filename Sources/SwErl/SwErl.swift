@@ -794,7 +794,7 @@ struct Registrar{
     static var global:Registrar = Registrar()
     
     /// Concurrent queue for thread-safe access to `Registrar`s dictionary-type properties.
-    static let queue = DispatchQueue(label: "Registrar Concurrent Queue", attributes: .concurrent)
+    static let queue = DispatchQueue(label: "Registrar Concurrent Queue")
     
     /// Dictionary mapping Pids to SwErl processes.
     var processesLinkedToPid:[Pid:SwErlProcess] = [:]
