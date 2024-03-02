@@ -72,7 +72,7 @@ public typealias SwErlStatelessHandler = (Pid, SwErlMessage) -> ()
 ///   - `.alreadyStarted`: Indicates an attempt to start a process that has already been started.
 ///
 /// - Author: Lee S. Barney
-/// - Version: 0.1
+/// - Version: 0.1 
 // MARK: SwErlError
 public enum SwErlError: Error {
     case processAlreadyLinked
@@ -447,41 +447,43 @@ public enum SwErlPassed{
     Registrar.setProcessState(forID: PID, value: initialState)
     return PID
 }
-/// Links a unique name to a stateful function or closure, executing it asynchronously without sending a result back to the message sender. The execution queue can be any `DispatchQueue`, either custom or built-in, with a default of `DispatchQueue.global()`. The state managed by this function or closure can be of any valid Swift type, facilitating flexible and dynamic state management strategies.
-///
-/// - Parameters:
-///   - makeAvailable: Determines the availability scope of the function or closure, with options being `.local` or `.global`. The `.global` option allows the function or closure to be executed by other nodes within the node it is spawned.
-///   - queueToUse: The `DispatchQueue` on which the function or closure will be executed. Defaults to `DispatchQueue.global()`.
-///   - name: An optional unique string identifier for the function or closure. Defaults to `nil`.
-///   - function: The function or closure to be executed asynchronously on the specified `DispatchQueue`.
-/// - Returns: A SwErl `Pid` that uniquely identifies the spawned process.
-///
-/// - Author: Lee S. Barney
-/// - Version: 0.1
-
+/**
+ This function is used to link a unique name to a stateful function or closure that is executed asynchronously with no result being sent to the process sending the message. Any DispatchQueue desired for running the function or closure can be passed as the first parameter. The state can be any valid Swift type, a tuple, a list, a dictionary, optional, closure, etc.
+ - Parameters:
+ - makeAvailable: options:Availability.local or Availability.global. The .global option allows other nodes to execute the function or closure on the node it is spawned inside of.
+ - queueToUse: any DispatchQueue, custom or built-in. Default is _DispatchQueue.global()_
+ - name: a unique string optional used as an identifier. . Default is nil_
+ - function: the function or closure to execute using the DispatchQueue
+ - Value: a SwErl Pid
+ - Author:
+ Lee S. Barney
+ - Version:
+ 0.1
+ */
 @discardableResult public func spawnasysf(queueToUse:DispatchQueue = DispatchQueue.global(),name:String?=nil,initialState:SwErlState,function:@escaping @Sendable(Pid,SwErlState,SwErlMessage)->SwErlState)throws -> Pid {
     let PID = Registrar.generatePid()
     guard let name = name else{
         try Registrar.link(SwErlProcess(queueToUse:queueToUse, registrationID: PID, functionality: function), PID: PID)
-        Registrar.local.processStates[PID] = initialState
+        Registrar.setProcessState(forID: PID, value: initialState)
         return PID
     }
     try Registrar.link(SwErlProcess(queueToUse:queueToUse, registrationID: PID, functionality: function), name: name, PID: PID)
-    Registrar.local.processStates[PID] = initialState
+    Registrar.setProcessState(forID: PID, value: initialState)
     return PID
 }
 
-/// Links a unique name to a stateless function or closure, executing it asynchronously. Once linked, the function becomes available for remote calls from any SwErl compatible node. This setup supports using any desired `DispatchQueue` for execution, facilitating integration with both custom and built-in dispatch queues.
-///
-/// - Parameters:
-///   - queueToUse: The `DispatchQueue` on which the function or closure will be executed. Defaults to `DispatchQueue.global()`.
-///   - name: A unique string identifier for the function or closure.
-///   - function: The function or closure to be executed asynchronously on the specified `DispatchQueue`.
-/// - Returns: A SwErl `Pid` that uniquely identifies the linked function or closure.
-///
-/// - Author: Lee S. Barney
-/// - Version: 0.1
-
+/**
+ This function is used to link a unique name to a stateless function or closure that is executed asynchronously. The function is then available to be called remotely from any SwErl compatable node. Any DispatchQueue desired for running the function or closure can be passed as the first parameter.
+ - Parameters:
+ - queueToUse: any DispatchQueue, custom or built-in. Default is _DispatchQueue.global()_
+ - name: a unique string used as an identifier.
+ - function: the function or closure to execute using the DispatchQueue
+ - Value: a SwErl Pid
+ - Author:
+ Lee S. Barney
+ - Version:
+ 0.1
+ */
 // MARK: Spawn Globally
 @discardableResult public func spawnGlobally(queueToUse:DispatchQueue = DispatchQueue.global(),name:String,function:@escaping @Sendable(Pid,SwErlMessage)->Void)throws -> Pid {
     let PID = Registrar.generatePid()
@@ -489,21 +491,22 @@ public enum SwErlPassed{
     return PID
 }
 
-/// Links a unique name to a stateful function or closure, executing it synchronously. This function becomes available for remote invocation from any SwErl compatible node, with results being sent back to the initiating process. The execution context can be specified through any `DispatchQueue`, allowing for flexibility in where and how the function or closure runs. The state managed by this function or closure can encompass any valid Swift type, enabling a wide range of data structures and logic encapsulations.
-///
-/// - Parameters:
-///   - queueToUse: The `DispatchQueue` for executing the function or closure. Defaults to `DispatchQueue.global()`.
-///   - name: A unique string identifier for the function or closure.
-///   - function: The function or closure to be executed synchronously on the specified `DispatchQueue`.
-/// - Returns: A SwErl `Pid` that uniquely identifies the linked function or closure.
-///
-/// - Author: Lee S. Barney
-/// - Version: 0.1
-
+/**
+ This function is used to link a unique name to a stateful function or closure that is executed synchronously. The function is then available to be called remotely from any SwErl compatable node. A result is sent back to the process sending the initial message. Any DispatchQueue desired for running the function or closure can be passed as the first parameter. The state can be any valid Swift type, a tuple, a list, a dictionary, optional, closure, etc.
+ - Parameters:
+ - queueToUse: any DispatchQueue, custom or built-in.. Default is _DispatchQueue.global()_
+ - name: a unique string used as an identifier.
+ - function: the function or closure to execute using the DispatchQueue
+ - Value: a SwErl Pid
+ - Author:
+ Lee S. Barney
+ - Version:
+ 0.1
+ */
 @discardableResult public func spawnGlobally(queueToUse:DispatchQueue = DispatchQueue.global(),name:String,initialState:SwErlState,function:@escaping @Sendable(Pid,SwErlState,SwErlMessage) -> (SwErlResponse,SwErlState))throws -> Pid {
     let PID = Registrar.generatePid()
     try Registrar.link(SwErlProcess(registrationID: PID, functionality: function), .global, name: name, PID: PID)
-    Registrar.local.processStates[PID] = initialState
+    Registrar.setProcessState(forID: PID, value: initialState)
     return PID
 }
 
@@ -814,7 +817,7 @@ struct Registrar{
     ///
     /// - Complexity: O(1) constant time.
     static func generatePid()->Pid{
-        queue.sync(flags: .barrier){
+        queue.sync{
             let (anID,aSerial) = pidCounter.next()
             return Pid(id: anID, serial: aSerial, creation: 0)
         }
@@ -834,7 +837,7 @@ struct Registrar{
     /// - Complexity: O(1) constant time for local or global link.
     // MARK: Registrar Link
     static func link(_ toBeAdded:SwErlProcess,_ makeAvailable:RegistrationType = RegistrationType.local, initState:Any = "SwErlNone", name:String = "SwErlNone", PID:Pid) throws{
-        try queue.sync(flags: .barrier) {
+        try queue.sync {
             //This implementation has a lot of code duplication in it.
             //The implementation where a local variable is used to hold
             //the registrar instance to use, local or global,
@@ -893,7 +896,7 @@ struct Registrar{
     /// - Complexity: O(1) constant time for local or global link.
     
     static func link<T:OTPActor_behavior>(callbackType: T.Type,_ makeAvailable:RegistrationType = RegistrationType.local, processQueue: DispatchQueue, initState: Any?, name:String = "SwErlNone", PID:Pid) throws{
-        try queue.sync(flags: .barrier) {
+        try queue.sync {
             //This implementation has a lot of code duplication in it.
             //The implementation where a local variable is used to hold
             //the registrar instance to use, local or global,
@@ -932,8 +935,8 @@ struct Registrar{
     /// - Complexity: O(1) constant time.
     // MARK: Registrar Unlink
     static func unlink(_ registrationID:Pid){
-        _ = queue.sync(flags: .barrier) { local.processesLinkedToPid.removeValue(forKey: registrationID) }
-        _ = queue.sync(flags: .barrier) { local.OTPActorsLinkedToPid.removeValue(forKey: registrationID) }
+        _ = queue.sync { local.processesLinkedToPid.removeValue(forKey: registrationID) }
+        _ = queue.sync { local.OTPActorsLinkedToPid.removeValue(forKey: registrationID) }
     }
     
     /// Removes the link between a name and a `Pid`, and removes the associated process.
@@ -943,10 +946,10 @@ struct Registrar{
     ///
     /// - Complexity: O(1) constant time.
     static func unlink(_ name:String){
-        guard let PID = queue.sync(execute: {local.processesLinkedToName[name]}) else{
+        guard let PID = Registrar.getPid(forName: name) else{
             return
         }
-        _ = queue.sync(flags: .barrier){ local.processesLinkedToName.removeValue(forKey: name) }
+        _ = queue.sync{ local.processesLinkedToName.removeValue(forKey: name) }
         Registrar.unlink(PID)
     }
     
@@ -983,7 +986,7 @@ struct Registrar{
     
     /// - Complexity: O(1) constant time.
     static func getProcess(forID:String)->SwErlProcess?{
-        guard let pid = queue.sync(execute: {local.processesLinkedToName[forID]}) else {
+        guard let pid = queue.sync(flags: .barrier, execute: {local.processesLinkedToName[forID]}) else {
             return nil
         }
         return getProcess(forID: pid)

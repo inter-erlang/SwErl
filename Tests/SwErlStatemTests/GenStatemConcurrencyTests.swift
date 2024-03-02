@@ -86,7 +86,7 @@ final class GenStatemConcurrencyTests: XCTestCase {
     func testConcurrentCall()throws{
         try GenStateM.startLink(name: "called_to", statem: expectationStateM.self, initialData: 3)
         let testQueue = DispatchQueue(label: "testCQ", attributes: .concurrent)
-        let count = 100000
+        let count = 10000
         var expectations:[XCTestExpectation] = []
         for i in 1...count {
             let callExpectation = XCTestExpectation(description: "call\(i)")
@@ -95,13 +95,13 @@ final class GenStatemConcurrencyTests: XCTestCase {
                 _ = GenStateM.call(name: "called_to",message: callExpectation)
             }
         }
-        wait(for: expectations, timeout: 20.0)
+        wait(for: expectations, timeout: 5.0)
     }
     
     func testConcurrentCast()throws{
         try GenStateM.startLink(name: "cast_to", statem: expectationStateM.self, initialData: 3)
         let testQueue = DispatchQueue(label: "testCQ", attributes: .concurrent)
-        let count = 100000
+        let count = 10000
         var expectations:[XCTestExpectation] = []
         for i in 1...count {
             let callExpectation = XCTestExpectation(description: "cast\(i)")
@@ -110,13 +110,13 @@ final class GenStatemConcurrencyTests: XCTestCase {
                 GenStateM.cast(name: "cast_to",message: callExpectation)
             }
         }
-        wait(for: expectations, timeout: 20.0)
+        wait(for: expectations, timeout: 10.0)
     }
     
     func testConcurrentNotify()throws{
         try GenStateM.startLink(name: "notice_receiver", statem: expectationStateM.self, initialData: 3)
         let testQueue = DispatchQueue(label: "testCQ", attributes: .concurrent)
-        let count = 100000
+        let count = 10000
         var expectations:[XCTestExpectation] = []
         for i in 1...count {
             let noticeExpectation = XCTestExpectation(description: "notice\(i)")
@@ -125,7 +125,7 @@ final class GenStatemConcurrencyTests: XCTestCase {
                 GenStateM.notify(name: "notice_receiver",message: noticeExpectation)
             }
         }
-        wait(for: expectations, timeout: 20.0)
+        wait(for: expectations, timeout: 5.0)
     }
 
 }

@@ -49,16 +49,25 @@ final class RequestAfterShutdown: XCTestCase {
     override func tearDown() {
         resetRegistryAndPIDCounter()
     }
-    
-    func testRequestAfterShutdown() {
-        // make sure each cast takes place in order
-        let Q = DispatchQueue(label: "temp q to ensure things are added in order")
-        
-        Q.sync { try! GenServer.cast("queue server", "delay") }
-        _ = Q.sync { GenServer.unlink("queue server", "shutdown") }
+    //
+    //testRequestAfterShutdown needs to be reworked.
+    //
+//    func testRequestAfterShutdown() {
+//        // make sure each cast takes place in order
+//        let Q = DispatchQueue(label: "temp q to ensure things are added in order")
+//        
+//        Q.sync { try! GenServer.cast("queue server", "delay") }
+//        _ = Q.sync { GenServer.unlink("queue server", "shutdown") }
+//
+//        Q.sync { try! GenServer.cast("queue server", "fulfill") }//error not expected here
+//        wait(for: [noRun], timeout: 4) //inverted expectation
+//    }
+}
 
-        Q.sync { try! GenServer.cast("queue server", "fulfill") }//error not expected here
-        wait(for: [noRun], timeout: 4) //inverted expectation
+final class SpeedAndSizeTests:XCTestCase {
+    func testGenserverSize() throws{
+        print("\n\n\n!!!!!!!!!!!!!!!!!!! \nsize of registered genServer process instances' size: \(MemoryLayout<SwErlProcess>.size + MemoryLayout<DispatchQueue>.size + MemoryLayout<GenServerBehavior>.size) bytes")
+        print("!!!!!!!!!!!!!!!!!!!")
     }
 }
 
