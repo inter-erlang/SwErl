@@ -1,78 +1,33 @@
-# SwErl
-
-
+![SwErl](Sources/SwErl/SwErl.docc/resources/logo_text.svg)
+SwErl is a general purpose concurrency library conforming to the design patterns and principles found in the Erlang Programming Language. SwErl also includes SwErl Node, an as-of-yet incomplete library allowing native Swift to connect to a distributed Erlang system as a near-fully featured node. For Swift Developers with little to no Erlang experience, a quick primer for SwErl [is provided here.](Sources/SwErl/SwErl/docc/BasicUsage.md) 
 ## Why SwErl?
+
+### Painless Concurrency
 Parallel and concurrent computing should not be hard! SwErl is a small package that reduces not only the difficulty of thinking about concurrency, but also how much code you have to write.
 
-Async-await and promises are both attempts at linearizing asynchronous code. As long as everything goes well, both of these approaches can make concurrent and parallel code seem easier to write and read. They do this by localizing code placement. But when something goes wrong, both still require deep and significant understanding of what is happening outside of the current thread. This includes not just semiphores and locks, but also race conditions and crosslocks. SwErl takes a different approach. It is designed embrace multi-core machines rather than hide those cores. It also negates the need for semiphores and locks, by negating the possibility of race conditions. With no semiphores or locks, crosslocks become a thing of the past.These pain-points of parallel and concurrent programming are now gone from your code, your worries, and your product.
+coroutines (async/await parallelism) and promises both attempt to linearize asynchronous code. As long as everything goes well, both of these approaches can make concurrent and parallel code seem easier to write and read. They do this by localizing code placement. But when something goes wrong, both still require deep and significant understanding of what is happening outside of the current thread. This includes not just semaphores and locks, but also race conditions and cross-locks. SwErl takes a different approach. It is designed embrace multi-core machines rather than hide those cores. It also eliminates the need for semaphores and locks, by negating the possibility of race conditions. With no semaphores or locks, cross-locks become a thing of the past.These pain-points of parallel and concurrent programming are now gone from your code, your worries, and your product.
 
-SwErl uses a spawn-send pattern. You spawn long-lived closures. Then elsewhere in your code you send messages to these spawned closures. Each time a closure recieves a message, it is assigned to be processed by a DispatchQueue. When the process finishes, the closure stops using any threads or threading resources. By using long-lived closures, SwErl reduces the amount of computation time spent creating and destroying the many short-lived closures in applications that highly leverage the current hardware designs of devices.
+SwErl uses a spawn-send pattern. You spawn long-lived processes. Then elsewhere in your code you send messages to these spawned processes. Each process processes messages within it's own execution context, provided by Foundations dispatch queues. When processes aren't processing or receiving messages they do not use any threads or threading resources. By using long-lived processes, SwErl reduces the amount of computation time spent creating and destroying the many short-lived threads in applications that highly leverage the current hardware designs of devices.
 
-SwErl also allows you to have closures spawn and terminate other closures. Such short-lived closures should be used sparingly since they use the same amout of computational effort to create and destroy as do long-lived closures.
-
-
-## Brief Usage Introduction
-Here is a simple example. It uses the main DispatchQueue. When executed, the closure prints out the SwErl process ID, not thread id, and whatever message is sent. Messages can be any valid Swift type. It could be a tuple, struct instance, class instance, string, Int, or any custom type in your application. It could even be another closure if you wanted. 
-```swift
-let examplePid = try spawn{(procPid, message) in
-    print("process: \(procPid) message: \(message)")
-    return SwErlProc.continue
-}
-```
-The <code>spawn</code> function registers your closure in a local registry. The value of this function is a process ID. A pid. Once registered, the pid can be used to send messages to the closure from <bold>anywhere</bold> in your code.
-
-Let's send a simple <code>String</code>-type message to the example closure above. 
-```swift    
-examplePid ! "Hi there."
-```
-The <code>!</code> send operator is all that's needed. Now let's send a tuple.
-```swift
-examplePid ! (7,3.5,"Sue")
-```
-
-You can send a message that includes any valid Swift type, including Pids. That means not only can you capture pids in a closure, you can pass them as part of a message. This gives you an ultimate way of chainging closures without using any callbacks!
-
-## Detailed Usage Explanation
-
-
-Simple examples like the one above often don't show the strengths of what can be done with SwErl. With SwErl processes, you can leverage every thread available on your device by composing your application, or package, using many SwErl processes. While you can create SwErl processes on the fly, they are best leveraged by creating all, or at least nearly all, when your code begins its execution. 
-
-By having all SwErl processes available at the end of launch-time, you application can now consist of processes that pass each other messages. Since the <code>!</code> operator can be used anywhere in your code, you can use it to pass messages directly from one process to another, without blocking the current process. This means it is very easy to chain SwErl processes in order to accomplish effectual computation. 
-
-You can even include SwErl process ID's, PID's, in the messages you send. This means you can write processes that determine which process(es) to send messages to at runtime.
-
-Also, since the <code>spawn</code> function accepts both functions and closures, if you use closures you can capture values that are used by each and every execution of a SwErl process without passing those values in messages.
-
-I look forward to seeing how you leverage this dynamic parallelism and concurrency library in your products.
-
-### SwErl Process Types 
-
-There are two types of SwErl processes you can spawn, stateless and stateful.
-### Stateless SwErl Processes
-
-Stateless processes should be the default type you use in your code. They provide the greatest flexibility and speed. All stateless processes are executed asynchronously. They will use the threads available to your process as efficiently as possible. By default, all of your stateless processes are run on the global <code>DispatchQueue</code> with the <code>.default</code> quality of service. When you spawn a SwErl process, you can specify a dispatch queue of your choice. All stateless SwErl processes are executed asynchronously.
-### Stateful SwErl Processes
-Use stateful processes with care. Stateful processes should only be used when it is not possible to engineer a solution that uses only stateless processes. All stateful SwErl processes are executed synchronously. Therefore they can block threads. Using stateful SwErl processes introduces a bottleneck into your code.
-By default, all stateful SwErl processes are run on a global, custom serial dispatch queue with the <code>.default</code> quality of service. This choice of dispatch queue ensures that the states of each stateful SwErl process behave rationally and without race conditions. 
-You can specify a dispatch queue of your choice. Be careful when you do so. Apple's documentation states that if you create too many dispatch queues that block threads, your device will experience thread starvation. Thread starvation causes devices to crash, not just apps. 
-
-
+SwErl also allows you to have processes spawn and terminate other processes. Such short-lived processes should be used sparingly since they use the same amount of computational effort to create and destroy as do long-lived processes.
 ### SwErl Processes are Lightweight
-Each SwErl process is only 88 Bytes in size. Work is ongoing to reduce this size even further. Both stateful and stateless SwErl processes can be spawned quickly. On the deverloper's first-generation MacStudio, it took less than 0.0005 milliseconds to spawn individual processes and less than 0.00083 milliseconds per message sent. A test exists in the unit tests that allows you to see the speed of SwErl on your devices.
+Each SwErl process is only 88 Bytes in size. Work is ongoing to reduce this size even further. Both stateful and stateless SwErl processes can be spawned quickly. On one developer's first-generation MacStudio, it took less than 0.0005 milliseconds to spawn individual processes and less than 0.00083 milliseconds per message sent. A test exists in the unit tests that allows you to see the speed of SwErl on your devices.
 
-
+### Erlang Compatibility
+Though not presently implemented, SwErl will allow for seamless communication between Swift Apps and Erlang server code, simplifying client/server relationships and distributed applications.
 ## Installation
-
-### Swift Package Manager
-
+SwErl is available via the Swift Package Manager.
 ```swift
-.package(url: "https://github.com/yenrab/SwErl.git",  from: "0.9.11"),
-
+.package(url: "https://github.com/yenrab/SwErl.git", from: "0.9.11"),
 ```
+Manual installation is possible by built from source.
+## Compatibility
+SwErl Node requires networking primitives available only on Apple platforms. SwErl will not compile on other platforms.
 
-Also add `"SwErl"` to the target's dependencies.
+## Contributing
+SwErl welcomes contributions. If you don't know where to start, remember that this library aims to emulate Erlang's OTP features as closely as possible. Review Erlang's documentation for differences as a starting point.
 
+To help jump-start would-be contributors, SwErl includes an overview of how the library is implemented.
 
-## Underpinnings
-
-SwErl is an expression of the actor model. While Swift has items called actors, SwErl's' expression is simpler to use and avoids the over-proliferation of Swift's async/await syntax. 
+![SwErl Logo](Sources/SwErl/SwErl.docc/resources/logo.svg)
+Logo Credit: Jenna Ray
