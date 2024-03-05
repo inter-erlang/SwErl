@@ -545,8 +545,8 @@ extension Pid {
         }
         //stateful-synchronous processes handling done here.
         if let statefulClosure = process.syncStatefulLambda{
-            return process.queue.sync(flags: .barrier) {
-                guard let state = Registrar.local.processStates[lhs] else{
+            return process.queue.sync() {
+                guard let state = Registrar.getProcessState(forID: lhs) else {
                     return (SwErlPassed.fail,SwErlError.statem_behaviorWithoutState)
                 }
                 let (response,nextState) = statefulClosure(lhs,rhs,state)
@@ -556,18 +556,18 @@ extension Pid {
             }
         }
         //stateful-asynchronous processes handling done here.
-        else if let statefulClosure = process.asyncStatefulLambda{
-            //Use the global dispatch queue to asynchronously place the requests
-            // in a syncronous queue. This allows this execution to return without
-            //waiting for the closure to complete.
-            DispatchQueue.global().async(flags: .barrier){
-                guard let state = Registrar.local.processStates[lhs] else{
+        else if let statefulClosure = process.asyncStatefulLambda {
+
+            guard let process = Registrar.getProcess(forID: lhs) else {
+                return (SwErlPassed.fail, SwErlError.notRegisteredByPid)
+            }
+            process.queue.async {
+                guard let state = Registrar.getProcessState(forID: lhs) else{
                     return
                 }
                 let nextState = statefulClosure(lhs,rhs,state)
                 //Registrar.local.processStates[lhs] = nextState
                 Registrar.setProcessState(forID: lhs, value: nextState)
-                return
             }
             return (SwErlPassed.ok,nil)
         }
@@ -646,10 +646,6 @@ extension SwErlAtom {
         return atomName ! rhs
     }
 }
-
-
-
-
 
 /// SwErlProcess represents an Erlang-like process in Swift, designed to handle synchronous, asynchronous, stateful, and stateless operations.
 ///
@@ -794,7 +790,7 @@ struct Registrar{
     static var global:Registrar = Registrar()
     
     /// Concurrent queue for thread-safe access to `Registrar`s dictionary-type properties.
-    static let queue = DispatchQueue(label: "Registrar Concurrent Queue")
+    static let queue = DispatchQueue(label: "Registrar Concurrent Queue", attributes: .concurrent)
     
     /// Dictionary mapping Pids to SwErl processes.
     var processesLinkedToPid:[Pid:SwErlProcess] = [:]
@@ -814,10 +810,8 @@ struct Registrar{
     ///
     /// - Complexity: O(1) constant time.
     static func generatePid()->Pid{
-        queue.sync(flags: .barrier){
-            let (anID,aSerial) = pidCounter.next()
-            return Pid(id: anID, serial: aSerial, creation: 0)
-        }
+        let (anID,aSerial) = pidCounter.next()
+        return Pid(id: anID, serial: aSerial, creation: 0)
     }
     
     /// Links a SwErl process to a `Pid` or name, making it available globally or locally.
@@ -1016,6 +1010,21 @@ struct Registrar{
         return queue.sync{local.processesLinkedToName[forName]}
     }
     
+    /// Provides access to the state of a process by `name`.
+    ///
+    /// - Parameters:
+    ///   - forID: The `name` of the desired process.
+    ///
+    /// - Returns: The associated state or _nil_ if there is no state linked to the `name`.
+    ///
+    /// - Complexity: O(1) constant time.
+    // MARK: Get/Set Process State
+    static func getProcessState(forID: String) -> Any? {
+        guard let pid = queue.sync(execute: {local.processesLinkedToName[forID]}) else {
+            return nil
+        }        
+        return getProcessState(forID: pid)
+    }
     /// Provides access to the state of a process by `Pid`.
     ///
     /// - Parameters:
@@ -1037,25 +1046,6 @@ struct Registrar{
     /// - Complexity: O(1) constant time.
     static func setProcessState(forID: Pid, value: Any) {
         return queue.async(flags: .barrier){ local.processStates[forID] = value }
-    }
-    
-    /// Checks if a `Pid` is linked to an OTP Actor.
-    ///
-    /// - Parameters:
-    ///   - forID: The `Pid` to check.
-    ///
-    /// - Returns: `true` if the `Pid` is linked to an OTP Actor, `false` otherwise.
-    ///
-    /// - Complexity: O(1) constant time.
-    static func otpPidLinked(_ forID: Pid) -> Bool {
-        queue.sync {
-            switch local.OTPActorsLinkedToPid[forID] {
-            case nil :
-                return false
-            default:
-                return true
-            }
-        }
     }
     
     /// Checks if a `Pid` is linked to any process.
