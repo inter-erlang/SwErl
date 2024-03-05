@@ -236,18 +236,19 @@ public enum GenStateM:OTPActor_behavior{
         //on which the processing will happen
         DispatchQueue.global().async {
             //if the pid hasn't been registered correctly, return.
-            guard let process = Registrar.getProcess(forID: PID) else{
+            guard let process = Registrar.local.processesLinkedToPid[PID] else{
                 return
             }
-            guard let state = Registrar.getProcessState(forID: PID) else{
-                return
+            process.queue.sync {
+                guard let state = Registrar.local.processStates[PID] else{
+                    return
+                }
+                guard let (_,handleCast,_,_) = process.GenStatemProcessWrappers else{
+                    return
+                }
+                let (_,updatedState) = handleCast(message,state)
+                Registrar.local.processStates[PID] = updatedState //execute the handleCast function
             }
-            guard let (_,handleCast,_,_) = process.GenStatemProcessWrappers else{
-                return
-            }
-            //execute the handleCast function
-            let (_,updatedState) = handleCast(message,state)
-            Registrar.setProcessState(forID: PID, value: updatedState)
         }
     }
     
@@ -274,7 +275,7 @@ public enum GenStateM:OTPActor_behavior{
                 return
             }
             process.queue.sync {
-                guard let state = Registrar.getProcessState(forID: PID) else{
+                guard let state = Registrar.local.processStates[PID] else{
                     return
                 }
                 guard let (_,_,_,notify) = process.GenStatemProcessWrappers else{
@@ -308,14 +309,14 @@ public enum GenStateM:OTPActor_behavior{
         return process.queue.sync{//blocks until complete 😕
             //state machines always have a stored state.
             //if this one doesn't, do nothing.
-            guard let state = Registrar.getProcessState(forID: PID) else{
+            guard let state = Registrar.local.processStates[PID] else{
                 return (SwErlPassed.fail,SwErlError.statem_behaviorWithoutState)
             }
             guard let (handleCall,_,_,_) = process.GenStatemProcessWrappers else{
                 return (SwErlPassed.fail,"no handleCall function found")
             }
             let (response,updatedState) = handleCall(message,state)
-            Registrar.setProcessState(forID: PID, value: updatedState)
+            Registrar.local.processStates[PID] = updatedState
             return response
         }
     }

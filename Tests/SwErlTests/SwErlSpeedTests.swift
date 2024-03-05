@@ -60,7 +60,7 @@ final class SwErlSpeedTests: XCTestCase {
         
         let timer = ContinuousClock()
         var totalTime:Int64 = 0
-        let count:Int64 = 100000
+        let count:Int64 = 1000000
         for _ in 0..<count{
             let time = try timer.measure{
                 _ = try spawnasysf(initialState: 7, function: asyncStateful)
