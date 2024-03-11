@@ -141,7 +141,7 @@ final class SwErlStatemTests: XCTestCase {
         XCTAssertEqual(PID, Registrar.local.processesLinkedToName["someName"])
         let theProcess = Registrar.local.processesLinkedToPid[PID]!
         XCTAssertEqual(PID,theProcess.registeredPid)
-        XCTAssertNil(theProcess.statelessLambda)
+        XCTAssertNil(theProcess.asyncStatelessLambda)
         XCTAssertNil(theProcess.syncStatefulLambda)
         XCTAssertNil(theProcess.asyncStatefulLambda)
         XCTAssertNil(theProcess.eventHandlers)
