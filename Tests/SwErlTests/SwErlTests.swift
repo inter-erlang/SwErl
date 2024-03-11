@@ -219,8 +219,8 @@ final class SwErlTests: XCTestCase {
         XCTAssertNil(stateless.asyncStatefulLambda)
         XCTAssertEqual(stateless.queue, DispatchQueue.global())
         XCTAssertEqual(stateless.registeredPid, bingo)
-        XCTAssertNotNil(stateless.statelessLambda)
-        XCTAssertNoThrow(stateless.statelessLambda!(bingo,3))
+        XCTAssertNotNil(stateless.asyncStatelessLambda)
+        XCTAssertNoThrow(stateless.asyncStatelessLambda!(bingo,3))
     }
     
     func testStatelessSwerlProcessNoDefaults() throws {
@@ -232,8 +232,8 @@ final class SwErlTests: XCTestCase {
         XCTAssertNil(stateless.asyncStatefulLambda)
         XCTAssertEqual(stateless.queue, DispatchQueue.main)
         XCTAssertEqual(stateless.registeredPid, mainBingo)
-        XCTAssertNotNil(stateless.statelessLambda)
-        XCTAssertNoThrow(stateless.statelessLambda!(mainBingo,3))
+        XCTAssertNotNil(stateless.asyncStatelessLambda)
+        XCTAssertNoThrow(stateless.asyncStatelessLambda!(mainBingo,3))
     }
     
     func testStatefulSwerlProcessWithDefaults() throws {
@@ -243,7 +243,7 @@ final class SwErlTests: XCTestCase {
             updatedState.append(message as! String)
             return ((SwErlPassed.ok,7),updatedState)
         }
-        XCTAssertNil(stateful.statelessLambda)
+        XCTAssertNil(stateful.asyncStatelessLambda)
         XCTAssertEqual(stateful.queue.label, Pid.to_string(aPID))
         XCTAssertEqual(stateful.registeredPid, aPID)
         print("syncStatefuleLambda: \(String(describing: stateful.syncStatefulLambda))")
@@ -262,7 +262,7 @@ final class SwErlTests: XCTestCase {
             updatedState.append(message as! String)
             return ((SwErlPassed.ok,7),updatedState)
         }
-        XCTAssertNil(stateful.statelessLambda)
+        XCTAssertNil(stateful.asyncStatelessLambda)
         XCTAssertNil(stateful.asyncStatefulLambda)
         XCTAssertEqual(stateful.queue.label, Pid.to_string(hasStatePID))
         XCTAssertEqual(stateful.registeredPid, hasStatePID)
@@ -321,6 +321,23 @@ final class SwErlTests: XCTestCase {
         XCTAssertTrue(Registrar.pidLinked(third), "pidLinked not reporting true for extant pid")
         XCTAssertFalse(Registrar.pidLinked(second), "pidLinked not reporting false for extant pid")
         
+    }
+    
+    func testSyncStatelessProcess() throws{
+        let PID = try spawnsysl{PID,message in
+            guard let num = message as? Int else{
+                return (SwErlPassed.fail,-1)
+            }
+            return num + 1
+        }
+        var (worked,result) = PID ! 3
+        XCTAssertEqual(SwErlPassed.ok, worked)
+        XCTAssertEqual(4, result as? Int)
+        
+        
+        (worked,result) = PID ! -2
+        XCTAssertEqual(SwErlPassed.ok, worked)
+        XCTAssertEqual(-1, result as? Int)
     }
     func testSequencingOfSyncStatefulProcesses()throws{
         
