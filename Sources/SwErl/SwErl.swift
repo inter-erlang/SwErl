@@ -449,7 +449,7 @@ public enum SwErlPassed{
 }
 
 
-@discardableResult public func spawnsysl(_ makeAvailable: RegistrationType = .local, queueToUse: DispatchQueue = .global(), name: String? = nil, function: @escaping @Sendable (Pid,SwErlMessage) -> SwErlValue) throws -> Pid {
+@discardableResult public func spawnsysl(_ makeAvailable: RegistrationType = .local, queueToUse: DispatchQueue = .global(), name: String? = nil, function: @escaping @Sendable (Pid,SwErlMessage) -> SwErlResponse) throws -> Pid {
     let PID = Registrar.generatePid()
     guard let name = name else {
         try Registrar.link(SwErlProcess(queueToUse: queueToUse, registrationID: PID, functionality: function), PID: PID)
@@ -576,7 +576,7 @@ extension Pid {
                 
                 let response = statelessClosure(lhs,rhs)
                 
-                return (SwErlPassed.ok,response)
+                return response
             }
         }
         //stateful-asynchronous processes handling done here.
@@ -716,7 +716,7 @@ public struct SwErlProcess {
     public var asyncStatelessLambda: ((Pid, SwErlMessage) -> Void)? = nil
     
     
-    public var syncStatelessLambda: ((Pid, SwErlMessage) -> SwErlValue)? = nil
+    public var syncStatelessLambda: ((Pid, SwErlMessage) -> SwErlResponse)? = nil
     
     /// Tuple of GenStatem process wrappers used if this is a state machine process.
     public var GenStatemProcessWrappers: (SwErlClosure, SwErlClosure, SwErlClosure, SwErlClosure)? = nil
@@ -793,7 +793,7 @@ public struct SwErlProcess {
 
     public init(queueToUse: DispatchQueue = DispatchQueue.global(),
                 registrationID: Pid,
-                functionality: @escaping @Sendable (Pid, SwErlMessage) -> SwErlValue) throws {
+                functionality: @escaping @Sendable (Pid, SwErlMessage) -> SwErlResponse) throws {
         self.queue = queueToUse
         self.syncStatelessLambda = functionality
         self.registeredPid = registrationID
