@@ -76,7 +76,7 @@ try spawnasysl(name: "printProcess"){(pid, message) in
 "printProcess" ! "It's Me."
 ```
 
-Message passing to asynchrounous processes are unidirectional. This means the caller does not wait for a response before continuing. Nor is there a promise, handle, or anything of the sort used. Once a message is sent to an asynchrounous process, the next line of code executes. If you want to request further computation, a named process can be used and sent the results of the async process' computation. You 'cast' messages to async processes. 
+Message passing to asynchrounous processes are unidirectional. This means the caller does not wait for a response before continuing. There is no promise, handle, or anything of the sort required in SwErl. Once a message is sent to an asynchrounous process, the next line of code executes. If you want to request further computation, a named process can be used and sent the results of the async process' computation. You 'cast' messages to async processes. 
 
 ```swift
 // This example is quite contrived, your architecture will often look quite different.
