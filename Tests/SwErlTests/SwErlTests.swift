@@ -69,7 +69,6 @@ final class SwErlTests: XCTestCase {
     
     func testHappyPathSpawnStateless() throws {
         let PID = try spawnasysl{(PID, message) in
-            print("hello \(message)")
             return
         }
         XCTAssertEqual(1,Registrar.local.processesLinkedToPid.count)
@@ -326,9 +325,9 @@ final class SwErlTests: XCTestCase {
     func testSyncStatelessProcess() throws{
         let PID = try spawnsysl{PID,message in
             guard let num = message as? Int else{
-                return (SwErlPassed.fail,-1)
+                return (SwErlPassed.fail,nil)
             }
-            return num + 1
+            return (SwErlPassed.ok,num + 1)
         }
         var (worked,result) = PID ! 3
         XCTAssertEqual(SwErlPassed.ok, worked)
@@ -338,6 +337,10 @@ final class SwErlTests: XCTestCase {
         (worked,result) = PID ! -2
         XCTAssertEqual(SwErlPassed.ok, worked)
         XCTAssertEqual(-1, result as? Int)
+        
+        (worked,result) = PID ! "hello"
+        XCTAssertEqual(SwErlPassed.fail, worked)
+        XCTAssertEqual(nil, result as? Int)
     }
     func testSequencingOfSyncStatefulProcesses()throws{
         
