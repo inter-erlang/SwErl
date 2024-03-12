@@ -447,6 +447,18 @@ public enum SwErlPassed{
     Registrar.setProcessState(forID: PID, value: initialState)
     return PID
 }
+
+
+@discardableResult public func spawnsysl(_ makeAvailable: RegistrationType = .local, queueToUse: DispatchQueue = .global(), name: String? = nil, function: @escaping @Sendable (Pid,SwErlMessage) -> SwErlValue) throws -> Pid {
+    let PID = Registrar.generatePid()
+    guard let name = name else {
+        try Registrar.link(SwErlProcess(queueToUse: queueToUse, registrationID: PID, functionality: function), PID: PID)
+        return PID
+    }
+    try Registrar.link(SwErlProcess(queueToUse: queueToUse, registrationID: PID, functionality: function), name: name, PID: PID)
+    return PID
+}
+
 /**
  This function is used to link a unique name to a stateful function or closure that is executed asynchronously with no result being sent to the process sending the message. Any DispatchQueue desired for running the function or closure can be passed as the first parameter. The state can be any valid Swift type, a tuple, a list, a dictionary, optional, closure, etc.
  - Parameters:
@@ -558,6 +570,15 @@ extension Pid {
                 return response
             }
         }
+        //stateless-synchronous processes handling done here.
+        if let statelessClosure = process.syncStatelessLambda{
+            return process.queue.sync(flags: .barrier) {
+                
+                let response = statelessClosure(lhs,rhs)
+                
+                return (SwErlPassed.ok,response)
+            }
+        }
         //stateful-asynchronous processes handling done here.
         else if let statefulClosure = process.asyncStatefulLambda{
             //Use the global dispatch queue to asynchronously place the requests
@@ -574,8 +595,8 @@ extension Pid {
             }
             return (SwErlPassed.ok,nil)
         }
-        //must be stateless closure
-        guard let statelessClosure = process.statelessLambda else{
+        //must be stateless asynchronous closure
+        guard let statelessClosure = process.asyncStatelessLambda else{
             return (SwErlPassed.fail, SwErlError.missingClosure)
         }
         process.queue.async{()->Void in
@@ -688,11 +709,14 @@ public struct SwErlProcess {
     ///   The updated state of the process.
     public var asyncStatefulLambda: ((Pid, SwErlState, SwErlMessage) -> SwErlState)? = nil
     
-    /// Lambda for stateless operations used if this is a Simple stateless process.
+    /// Lambda for asynchronous stateless operations used if this is a Simple stateless process.
     /// - Parameters:
     ///   - Pid: The registered name of the process.
     ///   - SwErlMessage: The message triggering the operation.
-    public var statelessLambda: ((Pid, SwErlMessage) -> Void)? = nil
+    public var asyncStatelessLambda: ((Pid, SwErlMessage) -> Void)? = nil
+    
+    
+    public var syncStatelessLambda: ((Pid, SwErlMessage) -> SwErlValue)? = nil
     
     /// Tuple of GenStatem process wrappers used if this is a state machine process.
     public var GenStatemProcessWrappers: (SwErlClosure, SwErlClosure, SwErlClosure, SwErlClosure)? = nil
@@ -703,7 +727,7 @@ public struct SwErlProcess {
     /// The registered Pid of the process.
     public let registeredPid: Pid
     
-    /// Initializes a Simple synchronous stateful process.
+    /// Initializes a synchronous stateful process.
     ///
     /// - Parameters:
     ///   - queueToUse: Optional. The dispatch queue for handling operations. The default for this parameter is `DispatchQueue.global()`.
@@ -720,7 +744,7 @@ public struct SwErlProcess {
         self.registeredPid = registrationID
     }
     
-    /// Initializes an Simple asynchronous stateful process.
+    /// Initializes an asynchronous stateful process.
     ///
     /// - Parameters:
     ///   - queueToUse: Optional. The dispatch queue for handling operations. The default for this parameter is `DispatchQueue.global()`.
@@ -738,7 +762,7 @@ public struct SwErlProcess {
         
     }
     
-    /// Initializes a Simple stateless process.
+    /// Initializes an asynchronous stateless process.
     ///
     /// - Parameters:
     ///   - queueToUse: Optional. The dispatch queue for handling operations. The default for this parameter is `DispatchQueue.global()`.
@@ -748,7 +772,30 @@ public struct SwErlProcess {
                 registrationID: Pid,
                 functionality: @escaping @Sendable (Pid, SwErlMessage) -> Void) throws {
         self.queue = queueToUse
-        self.statelessLambda = functionality
+        self.asyncStatelessLambda = functionality
+        self.registeredPid = registrationID
+    }
+    
+    /// Initializes a new instance of a synchronous stateless SwErlProcess.
+    /// This initializer sets up the SwErlProcess with a dispatch queue, registration ID, and a function or closure to execute.
+    ///
+    /// - Parameters:
+    ///   - queueToUse: The `DispatchQueue` to be used by the SwErlProcess. Defaults to the global concurrent queue.
+    ///   - registrationID: A `Pid` value that uniquely identifies the SwErlProcess.
+    ///   - functionality: A closure that takes a `Pid` and a `SwErlMessage` as inputs and returns a `SwErlResponse`. This is the functionality to be executed by the SwErlProcess.
+    ///
+    /// - Complexity: O(1).
+    ///
+    /// - Throws: An error if the process initialization encounters issues.
+    ///
+    /// - Author: Lee Barney
+    /// - Version: 0.1
+
+    public init(queueToUse: DispatchQueue = DispatchQueue.global(),
+                registrationID: Pid,
+                functionality: @escaping @Sendable (Pid, SwErlMessage) -> SwErlValue) throws {
+        self.queue = queueToUse
+        self.syncStatelessLambda = functionality
         self.registeredPid = registrationID
     }
     
