@@ -4,102 +4,129 @@ The most important features of SwErl
 
 ## Overview
 
-Most SwErl apps will contain hundreds of independent processes communicating with messages. This will show you how to spawn and message processes, and teach you the basics of how to design and build apps built on processes.
+Most SwErl apps will contain many of independent, light-weight SwErl processes communicating via message passing. This document shows how to spawn processes and send them messages. It also gives examples of how to design apps using SwErl.
 
 
-## Processes
+## SwErl Processes
 
-To spawn most SwErl processes, we simply provide `spawn()` a closure. Any time a message is sent to that process, the closure will execute. These closures must have two arguments. The first is the PID of the process associated with the closure, the second is the message provided by the caller. No need to worry about providing `pid`, SwErl does that automatically.
+To spawn SwErl processes, all that is needed is to execute the appropriate `spawn` function and pass it a closure. Any time a message is sent to that process, the closure will execute. These closures have two arguments if they are stateless, three arguments if they are stateful. The first argument is the Process ID (PID) of the SwErl process spawned using the closure. The second is the message provided by the caller. For stateful processes, the third parameter of the closure is the current state of the process. SwErl provides the PID parameter for your optional use.
 
-Once you have a process you pass it messages with the send operator: `!` .
+Once you have a spawned a process, pass it messages with the send operator: `!` .
 
-Because messages can be any type, you will often need to cast message to expected types.
+Because messages can be any type, inside of the process the message must be cast message to expected types.
+
+Here is an example of spawning an asynchronous, stateless process.
 
 ```swift
-let myMessage = "Some message, any type is fine!"
 
-let myProcess = try spawnsysf{(pid, message) in
-	switch message {
-		case let message as String :
-			// The below simply demonstrating that the message argument is what's on the
-			// RHS of the send operator. This assert throws if you pass in a
-			// different message.
-			assert(message == myMessage, "Did you pass in a different message?")
-		default : 
-			break
-	}
+let printProcess = spawnasysl{(PID, message) in
+    guard let message = message as? Int else{
+        return
+    }
+
+    var response = ""
+    switch message{
+    case 1:
+        response = "hello"
+    case 2:
+        response = "good to meet you"
+    default:
+        response = "goodbye"
+    }
+    print("\(response)")
+    return
 }
-myProcess ! myMessage
+printProcess ! 3
+```
+Here is an example of spawning a synchronous, stateless process. Notice that a `SwErlPassed` enumeration is used to indicate success or failure. This allows for easy detection of success or failure without throwing exceptions.
+
+```swift
+
+let printProcess = spawnsysl{(PID, message) in
+    guard let message = message as? Int else{
+        return (SwErlPassed.fail,nil)
+    }
+
+    var response = ""
+    switch message{
+    case 1:
+        response = "hello"
+    case 2:
+        response = "good to meet you"
+    default:
+        response = "goodbye"
+    }
+    return (SwErlPassed.ok,response)
+}
+guard let (worked,aMessage) = printProcess ! 3 as? (SwErlPassed,String), worked == SwErlProcess.ok else{
+//error handling code here
+    return
+}
 ```
 
-Processes can also be registered with names, which can then be used instead of the pid variable as a string literal in source code. If you're familiar with Erlang, these string literals are serving the roll of atoms.
+Two other types of processes are availaible. These are synchronous-stateful,`spawnsysf`, and asynchronous-statefull, `spawnasysf`.
+
+Processes can also be registered by name. The name can then be used instead of the pid variable as a string literal in source code.
 
 ```swift
-_ = try spawnsysf(name: "my_process"){(pid, message) in
+try spawnasysl(name: "printProcess"){(pid, message) in
     print(message)
 }
 
-"my_process" ! "Hi there."
+"printProcess" ! "It's Me."
 ```
 
-Message passing like this is unidirectional. The caller does not wait for a response before continuing, and does not receive a promise or a handle or anything of the sort. Once a message is sent, it is completely in the domain of the callee. If you want to get a response to your message, you'll have to provide a return address.
+Message passing to asynchrounous processes are unidirectional. This means the caller does not wait for a response before continuing. Nor is there a promise, handle, or anything of the sort used. Once a message is sent to an asynchrounous process, the next line of code executes. If you want to request further computation, a named process can be used and sent the results of the async process' computation. You 'cast' messages to async processes. 
 
 ```swift
 // This example is quite contrived, your architecture will often look quite different.
-
-_ = try spawnsysf(name: "replier"){(pid, message) in
-    switch message {
-        case let (pid, str) as (Pid, String) :
-            pid ! "\(procPid) received the following message: \(str)"
-        case let str as String :
-            print("no way to reply to message \(str)")
+enum Command{
+    case multiply
+    case add
+}
+_ = try spawnasysl(name: "initializer"){(pid, message) in
+    guard let (command,number) = message as? (Int,Int) else{
+        return
+    }
+    switch command {
+        case .multiply:
+            "receivingProcess" ! number * number
+        case .add:
+            "receivingProcess" ! number + number
         default:
-            break
+            return
     }
 }
 
-_ = try spawnsysf(name: "myProcess"){(pid, message) in
-    switch message {
-        case let str as String:
-            // BUG THIS IS NOT HOW TO PATTERN MATCH IN THIS LANGUAGE
-            // MUST FIND HOW TO DO THIS WITHOUT NESTING
-            if (str == "start") {
-                "replier" ! (procPid, "first message!")
-            } else {
-                print("A response: \(str)")
-            }
-        default :
-            break
-    }
-}
-
-"myProcess" ! "start"
+"initializer" ! (Command.add,2)
 ```
+It is also possible to have the receiving process be the initializing process. This is referred to as 'casting back'.
 
 ## User I/O with SwErl
-SwErl processes are implemented using the default system-selected global dispatch queue by default. You can easily create a process which runs on the main thread for IO operations, however:
+SwErl processes are implemented using the default system-selected global dispatch queue by default. You can easily create a process which runs on the main thread for IO operations. This example is asynchrounous and stateful but any type of process can be spawned using .main.
 
 ```swift
-let ioProcess = try spawnsysf(queueToUse: DispatchQueue.main){
-	(procPid, message) in 
-		// Do some UI things.
+let ioProcess = try spawnasysf(queueToUse: DispatchQueue.main){
+	(procPid, message,state) in 
+		// Do some UI things and update the state.
+        return updatedState
     }
 ```
 
-The same for any concurrency in swift applies here. The main thread should be reserved for only the highest priority operations, such as those affecting the user interface.
+The main thread should be reserved for short, high priority operations such as those affecting the user interface.
 
 ## OTP Behaviors
-Generally speaking, these primitives reflect the usage and design of their Erlang counterparts, though with only the most oft-used functionality implemented. If you are unfamiliar with Erlang/OTP, you may find the [Erlang OTP Design Principles Documentation](https://www.erlang.org/doc/design_principles/des_princ) of interest.
-Behaviors are implemented as protocols in SwErl. Behaviors are 
+Behaviors reflect the usage and design of their Erlang counterparts, though with only the most oft-used functionality implemented. If you are unfamiliar with Erlang/OTP, you may find the [Erlang OTP Design Principles Documentation](https://www.erlang.org/doc/design_principles/des_princ) of interest.
+Behaviors are implemented as protocols in SwErl. The available behaviors are 
 
 ### GenServer
-GenServers, or Generic Servers are independent processes which act as servers in a client/server relationship. They have all the functionality of a normal SwErl process, including an internal state, with the added ability to accept and respond to synchronous requests via `GenServer.call(...)`. Other processes making a Call to a genServer will hang expecting a response. genServers in SwErl all have a uniform API accessible via `GenServer`. genServers are created by writing a static type conforming to `protocol GenServerBehavior` to establish the functionality of a genServer instance, then instantiated using`GenServer.link().`
+GenServers, or Generic Servers are independent processes which act as servers in a client/server relationship within the app. They have all the functionality of a synchrounous-stateful SwErl process, including an internal state, with the added ability to accept messages via `GenServer.cast(...)`. Other processes making a Call to a genServer will not wait expecting a response. If `GenServer.call(...)` is used by some other process or processes, they will wait to receive a response.
+genServers in SwErl all have a uniform API accessible via `GenServer`. genServers are created by writing a static type conforming to `protocol GenServerBehavior` to establish the functionality of a genServer instance, then instantiated using`GenServer.link().`
 
 To demonstrate, we will make an echo server.
 ```swift
 ///
 /// echo.swift
-/// Created by You, Today!
 ///
 
 enum echoServer : GenServerBehavior {
