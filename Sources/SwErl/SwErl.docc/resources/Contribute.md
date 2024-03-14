@@ -27,3 +27,4 @@ Each fetch from the registrar executes on the registrar's private readers/writer
 
 ## The Registrar
 The registrar is implemented with three dictionaries. Swift Dictionaries are not-thread safe, even where thread-safety would be expected in other similar dictionary implementations. Reads concurrent with any write to the dictionary will cause unrecoverable memory errors, even to different keys with statically sized keys and values.
+Work has been done to ensure these dictionaries are threadsafe.
