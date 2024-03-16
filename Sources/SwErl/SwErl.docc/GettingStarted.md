@@ -1,6 +1,6 @@
 # GettingStarted
 
-The most important features of SwErl
+A short overview of SwErl primatives and how to use them
 
 ## Overview
 

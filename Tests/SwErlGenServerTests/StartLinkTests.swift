@@ -29,9 +29,9 @@ final class Unnamed : XCTestCase {
         let serverPid = try! GenServer.startLink(SimpleCastServer.self, initialState)
         //check that the registry populated correctly
         let process = try XCTUnwrap(
-            Registrar.local.processesLinkedToPid[serverPid], "failed to unwrap type from pid")
+            Registrar.getProcess(forID:serverPid), "failed to unwrap type from pid")
         let serverData = try XCTUnwrap(
-            Registrar.local.processStates[serverPid], "failed to unwrap data from dict")
+            Registrar.getProcessState(forID:serverPid), "failed to unwrap data from dict")
         XCTAssertNoThrow(serverData as! Int)
         XCTAssertNoThrow(process.genServerBehavior as! SimpleCastServer.Type)
 
@@ -52,11 +52,11 @@ final class Named : XCTestCase {
         let initialState: Any = 10 as Any
         let name = try GenServer.startLink("name_test", SimpleCastServer.self, initialState)
         let serverPid = try XCTUnwrap(
-            Registrar.local.processesLinkedToName[name], "failed to unwrap pid from name")
+            Registrar.getPid(forName:name), "failed to unwrap pid from name")
         let process = try XCTUnwrap(
-            Registrar.local.processesLinkedToPid[serverPid], "failed to unwrap type from pid")
+            Registrar.getProcess(forID:serverPid), "failed to unwrap type from pid")
         let serverData = try XCTUnwrap(
-            Registrar.local.processStates[serverPid], "failed to unwrap data from dict")
+            Registrar.getProcessState(forID:serverPid), "failed to unwrap data from dict")
         XCTAssertNoThrow(process.genServerBehavior as! SimpleCastServer.Type)
 
         XCTAssertNoThrow(serverData as! Int)
@@ -77,11 +77,10 @@ final class Stateful : XCTestCase {
     func testStateful() throws {
         let initState = "A simple state"
         try GenServer.startLink("simple stateful", SimpleCastServer.self, initState)
-        print(Registrar.local.processesLinkedToName)
         let serverPid = try XCTUnwrap(
-            Registrar.local.processesLinkedToName["simple stateful"], "failed to unwrap pid from name")
+            Registrar.getPid(forName:"simple stateful"), "failed to unwrap pid from name")
         let serverData = try XCTUnwrap(
-            Registrar.local.processStates[serverPid], "failed to unwrap type from pid")
+            Registrar.getProcessState(forID:serverPid), "failed to unwrap type from pid")
         
         let unwrappedData = try XCTUnwrap(serverData, "failed to unwrap serverData") //May not need bonus unwrap?
         
@@ -94,9 +93,9 @@ final class Stateful : XCTestCase {
         let initState = ("pretend_atom", false,(3.1415 ,[2, 3, 5, 7, 11]))
         try GenServer.startLink("complex stateful", SimpleCastServer.self, initState)
         let serverPid = try XCTUnwrap(
-            Registrar.local.processesLinkedToName["complex stateful"], "failed to unwrap pid from name")
+            Registrar.getPid(forName:"complex stateful"), "failed to unwrap pid from name")
         let serverData = try XCTUnwrap(
-            Registrar.local.processStates[serverPid], "failed to unwrap data from dict")
+            Registrar.getProcessState(forID:serverPid), "failed to unwrap data from dict")
         
         let (string, bool, (float, list)) = serverData as! (String, Bool, (Double, Array<Int>))
         XCTAssertEqual(string, "pretend_atom", "string Saved incorrectly")

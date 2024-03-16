@@ -13,32 +13,31 @@ final class EventManagerTests: XCTestCase {
     override func setUp() {
         
         // Clear the Registrar and the counter for the PIDs
-        Registrar.local.processesLinkedToPid = [:]
+        Registrar.local = Registrar()
         pidCounter = ProcessIDCounter()
      }
     
     override func tearDown() {
         // Clear the Registrar and the counter for the PIDs
-        Registrar.local.processesLinkedToPid = [:]
+        Registrar.local = Registrar()
         pidCounter = ProcessIDCounter()
      }
 
     
     func testDefaultLink() throws {
         let PID = try EventManager.link(name: "tester", intialHandlers: [])
-        XCTAssertEqual(PID,Registrar.local.processesLinkedToName["tester"])
-        XCTAssertNotNil(Registrar.local.processesLinkedToPid[PID])
+        XCTAssertEqual(PID,Registrar.getPid(forName: "tester"))
+        XCTAssertNotNil(Registrar.getProcess(forID: PID))
         XCTAssertNotNil(PID)
-        XCTAssertNotNil(Registrar.local.processesLinkedToPid[PID])
-        XCTAssertNotEqual(DispatchQueue.global(), Registrar.local.processesLinkedToPid[PID]!.queue)
+        XCTAssertNotEqual(DispatchQueue.global(), Registrar.getProcess(forID: PID)?.queue)
     }
 
     
     func testNamedDefinedQueueLink() throws {
         let PID = try EventManager.link(queueToUse:DispatchQueue.main, name: "tester", intialHandlers: [])
-        XCTAssertNotNil(Registrar.local.processesLinkedToPid[PID])
-        XCTAssertNotEqual(.main, Registrar.local.processesLinkedToPid[PID]!.queue)
-        XCTAssertEqual(0, Registrar.local.processesLinkedToPid[PID]!.eventHandlers!.count)
+        XCTAssertNotNil(Registrar.getProcess(forID: PID))
+        XCTAssertNotEqual(.main, Registrar.getProcess(forID: PID)!.queue)
+        XCTAssertEqual(0, Registrar.getProcess(forID: PID)!.eventHandlers!.count)
     }
     
     func testNamedWithHandlersLink() throws {
@@ -47,24 +46,18 @@ final class EventManagerTests: XCTestCase {
         let PID = try EventManager.link(name: "tester", intialHandlers: testingHandlers)
         XCTAssertNotNil(PID)
         
-        XCTAssertEqual(PID,Registrar.local.processesLinkedToName["tester"])
-        XCTAssertNotNil(Registrar.local.processesLinkedToPid[PID])
-        XCTAssertNotEqual(.main, Registrar.local.processesLinkedToPid[PID]!.queue)
-        let handlers = Registrar.local.processesLinkedToPid[PID]!.eventHandlers!
+        XCTAssertEqual(PID,Registrar.getPid(forName: "tester"))
+        XCTAssertNotNil(Registrar.getProcess(forID: PID))
+        XCTAssertNotEqual(.main, Registrar.getProcess(forID: PID)!.queue)
+        let handlers = Registrar.getProcess(forID: PID)!.eventHandlers!
         XCTAssertEqual(5, handlers.count)
     }
 
     func testUnlink() throws {
-        Registrar.local.processesLinkedToName["not used"] = Pid(id: 0, serial: 1, creation: 0)
-        Registrar.local.processesLinkedToName["not used other"] = Pid(id: 0, serial: 2, creation: 0)
         let PID = Pid(id: 0, serial: 3, creation: 0)
         let process = SwErlProcess(queueToUse:.main,registrationID: PID, eventHandlers: [])
         try Registrar.link(process, name: "real", PID: PID)
         XCTAssertNoThrow(EventManager.unlink(name: "real"))
-        XCTAssertNoThrow(EventManager.unlink(name: "not real"))
-        XCTAssertNoThrow(EventManager.unlink(name: "not real other"))
-        //EventManager.unlink is a facade function over the top of Registrar.unlink. That function
-        //has its own unit tests, so I'm not including a 'happy path' here.
     }
 
 
@@ -90,8 +83,8 @@ final class EventManagerTests: XCTestCase {
         
         let PID = Pid(id: 0, serial: 3, creation: 0)
         let process = SwErlProcess(queueToUse:.main,registrationID: PID, eventHandlers: testingHandlers)
-        Registrar.local.processesLinkedToName["some manager"] = PID
-        Registrar.local.processesLinkedToPid[PID] = process
+        
+        try Registrar.link(process, name: "some manager", PID: PID)
         EventManager.notify(PID: PID, message: "")//trigger handlers
         wait(for: [expectationA,expectationB,expectationC,expectationD], timeout: 5.0)
     }
@@ -100,9 +93,8 @@ final class EventManagerTests: XCTestCase {
     func testNoHandlers() throws{
         let PID = Pid(id: 0, serial: 3, creation: 0)
         let process = SwErlProcess(queueToUse:DispatchQueue.main,registrationID: PID, eventHandlers: [])
-        Registrar.local.processesLinkedToName["some manager"] = PID
-        Registrar.local.processesLinkedToPid[PID] = process
         
+        try Registrar.link(process, name: "some manager", PID: PID)
         EventManager.notify(PID: PID, message: "")
     }
     

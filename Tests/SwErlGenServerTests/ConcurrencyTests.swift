@@ -33,7 +33,7 @@ final class ConcurrentAdditions : XCTestCase {
         }
         
         Q.sync(flags: .barrier) {
-            XCTAssertEqual(Registrar.local.processesLinkedToName.count,
+            XCTAssertEqual(Registrar.getNumNameLinkedProcesses(),
                            10000, "10000 processes not present in registrar")
         }
 //        //Now for concurrent Reads and writes. It's doing setup and teardown between tests, I think!

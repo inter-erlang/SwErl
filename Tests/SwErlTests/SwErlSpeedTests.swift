@@ -276,7 +276,7 @@ final class SwErlSpeedTests: XCTestCase {
         for count in stride(from: 1000, to: 51000, by: 1000) {
             
             // Clear the Registrar and the counter for the PIDs
-            Registrar.local.processesLinkedToPid = [:]
+            Registrar.local = Registrar()
             pidCounter = ProcessIDCounter()
             
             var totalTime:Int64 = 0

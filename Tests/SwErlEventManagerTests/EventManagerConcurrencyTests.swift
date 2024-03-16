@@ -37,9 +37,9 @@ final class EventManagerConcurrencyTests: XCTestCase {
             }
         }
         wait(for: expectations, timeout: 20.0)
-        XCTAssertEqual(count, Registrar.local.processesLinkedToName.count)
-        XCTAssertEqual(0, Registrar.local.processStates.count)
-        XCTAssertEqual(count, Registrar.local.processesLinkedToPid.count)
+        XCTAssertEqual(count, Registrar.getNumNameLinkedProcesses())
+        XCTAssertEqual(0, Registrar.getNumProcessStates())
+        XCTAssertEqual(count, Registrar.getNumProcessesLinkedToPid())
     }
     
     func testConcurrentNotifcation()throws {

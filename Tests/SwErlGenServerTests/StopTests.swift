@@ -26,9 +26,9 @@ final class Stop : XCTestCase {
     func testEmptyQueue() {
         _ = GenServer.unlink("server", "shutdown")
         Thread.sleep(forTimeInterval: 1)
-        XCTAssert(Registrar.local.processesLinkedToPid.isEmpty , "server ref not removed from pid:type dictionary")
+        XCTAssertEqual(Registrar.getNumProcessesLinkedToPid(), 0 , "server ref not removed from pid:type dictionary")
 
-        XCTAssert(Registrar.local.processesLinkedToName.isEmpty, "server ref not removed from name:pid dictionary")
+        XCTAssertEqual(Registrar.getNumNameLinkedProcesses(), 0, "server ref not removed from name:pid dictionary")
     }
 }
 

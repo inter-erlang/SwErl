@@ -12,14 +12,12 @@ final class SafeDataStructuresTests: XCTestCase {
     
     override func setUpWithError() throws {
       
-        Registrar.local.processesLinkedToPid = [:]
-        Registrar.local.processesLinkedToName = [:]
+        Registrar.local = Registrar()
     }
     
     override func tearDownWithError() throws {
         
-          Registrar.local.processesLinkedToPid = [:]
-          Registrar.local.processesLinkedToName = [:]
+          Registrar.local = Registrar()
     }
     
     func testBuildSafeAddGet() throws {

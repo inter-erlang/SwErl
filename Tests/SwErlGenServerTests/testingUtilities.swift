@@ -13,9 +13,7 @@ import XCTest
 let firstPid = Pid(id: 0, serial: 1, creation: 0)
 
 func resetRegistryAndPIDCounter() {
-    Registrar.local.processesLinkedToName = [:]
-    Registrar.local.processesLinkedToPid = [:]
-    Registrar.local.processStates = [:]
+    Registrar.local = Registrar()
     pidCounter = ProcessIDCounter()
 }
 

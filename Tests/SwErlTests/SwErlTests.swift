@@ -34,20 +34,14 @@ final class SwErlTests: XCTestCase {
     override func setUp() {
         
         // Clear the Registrar and the counter for the PIDs
-        Registrar.local.processesLinkedToName = [:]
-        Registrar.local.processStates = [:]
-        Registrar.local.processesLinkedToPid = [:]
-        Registrar.local.OTPActorsLinkedToPid = [:]
+        Registrar.local = Registrar()
         pidCounter = ProcessIDCounter()
     }
     
     override func tearDown() {
         // Clear the Registrar and the counter for the PIDs
         // Clear the Registrar and the counter for the PIDs
-        Registrar.local.processesLinkedToName = [:]
-        Registrar.local.processStates = [:]
-        Registrar.local.processesLinkedToPid = [:]
-        Registrar.local.OTPActorsLinkedToPid = [:]
+        Registrar.local = Registrar()
         pidCounter = ProcessIDCounter()
     }
     
@@ -71,7 +65,7 @@ final class SwErlTests: XCTestCase {
         let PID = try spawnasysl{(PID, message) in
             return
         }
-        XCTAssertEqual(1,Registrar.local.processesLinkedToPid.count)
+        XCTAssertEqual(1,Registrar.getNumProcessesLinkedToPid())
         XCTAssertEqual(Pid(id: 0, serial: 1, creation: 0), PID)
     }
     
@@ -80,7 +74,7 @@ final class SwErlTests: XCTestCase {
         let _ = try spawnasysf(initialState: 3){(procName, message,state) in
             return (true,5)
         }
-        XCTAssertEqual(1,Registrar.local.processesLinkedToPid.count)
+        XCTAssertEqual(1,Registrar.getNumProcessesLinkedToPid())
         
     }
     func testHappyPathSpawnWithName() throws {
@@ -88,7 +82,7 @@ final class SwErlTests: XCTestCase {
             print("hello \(message)")
             return
         }
-        XCTAssertEqual(1,Registrar.local.processesLinkedToName.count)
+        XCTAssertEqual(1,Registrar.getNumNameLinkedProcesses())
     }
     
     
@@ -154,7 +148,7 @@ final class SwErlTests: XCTestCase {
             secondPid ! message
             return
         }
-        XCTAssertEqual(2, Registrar.local.processesLinkedToPid.count)
+        XCTAssertEqual(2, Registrar.getNumProcessesLinkedToPid())
         
         initialPid ! "Sue"
         wait(for: [expectation], timeout: 10.0)
@@ -196,7 +190,7 @@ final class SwErlTests: XCTestCase {
         }
         XCTAssertNoThrow(try Registrar.link(stateless, PID: anID))
         XCTAssertNoThrow(anID ! "hello")
-        XCTAssertNotNil(Registrar.local.processesLinkedToPid[anID])
+        XCTAssertNotNil(Registrar.getProcess(forID: anID))
         
         let stopperID = Pid(id: 0, serial: 2, creation: 0)
         let stopper = try SwErlProcess(registrationID: stopperID){(name, message) in
@@ -205,8 +199,8 @@ final class SwErlTests: XCTestCase {
         XCTAssertNoThrow(try Registrar.link(stopper, PID: stopperID))
         XCTAssertNoThrow(stopperID ! "hello")
         
-        XCTAssertNotNil(Registrar.local.processesLinkedToPid[stopperID])
-        XCTAssertEqual(2, Registrar.local.processesLinkedToPid.count)
+        XCTAssertNotNil(Registrar.getProcess(forID: stopperID))
+        XCTAssertEqual(2, Registrar.getNumProcessesLinkedToPid())
     }
     
     func testStatelessSwerlProcessWithDefaults() throws {
@@ -277,7 +271,7 @@ final class SwErlTests: XCTestCase {
         let first = Pid(id: 0, serial: 1, creation: 0)
         let second = Pid(id: 0, serial: 2, creation: 0)
         let third = Pid(id: 0, serial: 3, creation: 0)
-        XCTAssertEqual(Registrar.local.processesLinkedToPid.count, 0)
+        XCTAssertEqual(Registrar.getNumProcessesLinkedToPid(), 0)
         let firstProc = try SwErlProcess(registrationID: first){(procName, message) in
             return
         }
@@ -287,19 +281,19 @@ final class SwErlTests: XCTestCase {
         let thirdProc = try SwErlProcess(registrationID: third){(procName, message) in
             return
         }
-        XCTAssertNil(Registrar.local.processesLinkedToPid[first])
-        XCTAssertNil(Registrar.local.processesLinkedToPid[second])
-        XCTAssertNil(Registrar.local.processesLinkedToPid[third])
+        XCTAssertNil(Registrar.getProcess(forID: first))
+        XCTAssertNil(Registrar.getProcess(forID: second))
+        XCTAssertNil(Registrar.getProcess(forID: third))
         
         XCTAssertNoThrow(try Registrar.link(firstProc, PID: first))
         XCTAssertNoThrow(try Registrar.link(secondProc, PID: second))
         XCTAssertNoThrow(try Registrar.link(thirdProc, PID: third))
         
+        XCTAssertNotNil(Registrar.getProcess(forID: first))
+        XCTAssertNotNil(Registrar.getProcess(forID: second))
+        XCTAssertNotNil(Registrar.getProcess(forID: third))
         
-        XCTAssertNotNil(Registrar.local.processesLinkedToPid[first])
-        XCTAssertNotNil(Registrar.local.processesLinkedToPid[second])
-        XCTAssertNotNil(Registrar.local.processesLinkedToPid[third])
-        XCTAssertEqual(3, Registrar.local.processesLinkedToPid.count)
+        XCTAssertEqual(3, Registrar.getNumProcessesLinkedToPid())
         
         
         XCTAssertThrowsError(try Registrar.link(thirdProc, PID: third))
@@ -366,7 +360,7 @@ final class SwErlTests: XCTestCase {
         PID ! (0.0,expectations[2])
         
         wait(for: expectations, timeout: 30.0)
-        XCTAssertEqual("5.0,2.0,0.0", Registrar.local.processStates[PID] as! String)
+        XCTAssertEqual("5.0,2.0,0.0",Registrar.getProcessState(forID: PID) as! String)
     }
     
     func testSequencingOfAsyncStatefulProcesses()throws{

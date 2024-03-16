@@ -561,7 +561,7 @@ extension Pid {
         //stateful-synchronous processes handling done here.
         if let statefulClosure = process.syncStatefulLambda{
             return process.queue.sync(flags: .barrier) {
-                guard let state = Registrar.local.processStates[lhs] else{
+                guard let state = Registrar.getProcessState(forID: lhs) else{
                     return (SwErlPassed.fail,SwErlError.statem_behaviorWithoutState)
                 }
                 let (response,nextState) = statefulClosure(lhs,rhs,state)
@@ -585,7 +585,7 @@ extension Pid {
             // in a syncronous queue. This allows this execution to return without
             //waiting for the closure to complete.
             DispatchQueue.global().async(flags: .barrier){
-                guard let state = Registrar.local.processStates[lhs] else{
+                guard let state = Registrar.getProcessState(forID: lhs) else{
                     return
                 }
                 let nextState = statefulClosure(lhs,rhs,state)
@@ -844,19 +844,19 @@ struct Registrar{
     static var global:Registrar = Registrar()
     
     /// Concurrent queue for thread-safe access to `Registrar`s dictionary-type properties.
-    static let queue = DispatchQueue(label: "Registrar Concurrent Queue")
+    private static let queue = DispatchQueue(label: "Registrar Concurrent Queue")
     
     /// Dictionary mapping Pids to SwErl processes.
-    var processesLinkedToPid:[Pid:SwErlProcess] = [:]
+    private var processesLinkedToPid:[Pid:SwErlProcess] = [:]
     
     /// Dictionary mapping unique names to Pids.
-    var processesLinkedToName:[String:Pid] = [:]
+    private var processesLinkedToName:[String:Pid] = [:]
     
     /// Dictionary mapping Pids to OTP Actors and their associated dispatch queues.
-    var OTPActorsLinkedToPid: [Pid : (OTPActor_behavior.Type, DispatchQueue)] = [:]
+    private var OTPActorsLinkedToPid: [Pid : (OTPActor_behavior.Type, DispatchQueue)] = [:]
     
     /// Dictionary mapping Pids to their associated states.
-    var processStates:[Pid:Any] = [:]
+    private var processStates:[Pid:Any] = [:]
     
     /// Generates a new `Pid` using a thread-safe shared counter.
     ///
@@ -1013,6 +1013,18 @@ struct Registrar{
         }
     }
     
+    static func getNumNameLinkedProcesses()->Int{
+        return Registrar.local.processesLinkedToName.count
+    }
+    
+    static func getNumProcessStates()->Int{
+        return Registrar.local.processStates.count
+    }
+    
+    static func getNumProcessesLinkedToPid()->Int{
+        return Registrar.local.processesLinkedToPid.count
+    }
+    
     /// Removes the state associated with a specific process identified by its `Pid`. This operation is synchronized to ensure thread safety, particularly when manipulating the process state storage.
     ///
     /// This function is typically called when a process is terminated or when its state needs to be explicitly cleared from the system. The removal is performed within a synchronous block on a designated queue to maintain consistency and prevent race conditions.
@@ -1054,6 +1066,7 @@ struct Registrar{
         }
         return getProcess(forID: pid)
     }
+    
     /// Provides access to a `Pid` linked to a name.
     ///
     /// - Parameters:
@@ -1086,7 +1099,11 @@ struct Registrar{
     ///
     /// - Complexity: O(1) constant time.
     static func setProcessState(forID: Pid, value: Any) {
-        return queue.async(flags: .barrier){ local.processStates[forID] = value }
+        return queue.sync{ local.processStates[forID] = value }
+    }
+    
+    static func clearAllProcessStates(){
+        queue.sync{ local.processStates = [:] }
     }
     
     /// Checks if a `Pid` is linked to an OTP Actor.
