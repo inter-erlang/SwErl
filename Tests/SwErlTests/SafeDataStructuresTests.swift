@@ -53,6 +53,7 @@ final class SafeDataStructuresTests: XCTestCase {
         "TestDictionary" ! (SafeDictCommand.add, "testKey", 1)
         // Verify the state is as expected
         let (success,_) = ("TestDictionary" ! (SafeDictCommand.remove,"testKey"))
+        XCTAssertEqual(SwErlPassed.ok, success)
         
         guard let (rawSuccess,rawDict) = ("TestDictionary" ! (SafeDictCommand.getRaw)) as? (SwErlPassed,[
             String:Int]) else{

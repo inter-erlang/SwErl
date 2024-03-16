@@ -448,6 +448,20 @@ public enum SwErlPassed{
     return PID
 }
 
+/// Spawns a new synchronous, stateless SwErl process.
+/// - Parameters:
+///   - makeAvailable: The registration type, either local or global. The default is local.
+///   - queueToUse: The dispatch queue to use for the new process. The default is `DispatchQueue.global()`.
+///   - name: The unique `String` identifier for the process. If not provided, the process will not be named.
+///   - function: The function or closure to be executed by the new process. This closure returns a `SwErlResponse`.
+/// - Returns: The newly generated `Pid` associated with the spawned process using the declared `DispatchQueue`.
+/// - Throws: An error if linking the process encounters issues.
+///
+/// - Complexity: O(1), assuming `Registrar.link` and `Registrar.generatePid` operate in constant time.
+///
+/// - Author: Lee Barney
+/// - Version: 0.9
+// MARK: System-Level Spawn
 
 @discardableResult public func spawnsysl(_ makeAvailable: RegistrationType = .local, queueToUse: DispatchQueue = .global(), name: String? = nil, function: @escaping @Sendable (Pid,SwErlMessage) -> SwErlResponse) throws -> Pid {
     let PID = Registrar.generatePid()
@@ -1013,14 +1027,44 @@ struct Registrar{
         }
     }
     
+    /// Returns the number of processes linked to names in the local registry.
+    ///
+    /// This method retrieves the count of all processes that have been linked to a specific name within the local scope of the `Registrar`. It's useful for understanding how many named processes are currently managed by the local registrar.
+    ///
+    /// - Returns: An `Int` representing the total number of named processes linked in the local registrar.
+    /// - Complexity: O(1), as it directly accesses the count property of the collection holding the named processes.
+    ///
+    /// - Author: Lee Barney
+    /// - Version: 0.9
+    // MARK: - Process Count Retrieval
     static func getNumNameLinkedProcesses()->Int{
         return Registrar.local.processesLinkedToName.count
     }
     
+    /// Returns the total number of process states managed by the local registrar.
+    ///
+    /// This method provides a quick way to retrieve the count of all process states within the local scope of the `Registrar`. It's beneficial for monitoring the overall number of processes in various states (e.g., running, suspended) managed by the local registrar.
+    ///
+    /// - Returns: An `Int` representing the total number of process states in the local registrar.
+    /// - Complexity: O(1), as it simply accesses the count property of the collection holding the process states.
+    ///
+    /// - Author: Lee Barney
+    /// - Version: 0.9
+    // MARK: - Process State Count Retrieval
     static func getNumProcessStates()->Int{
         return Registrar.local.processStates.count
     }
     
+    /// Returns the number of processes linked to PIDs in the local registry.
+    ///
+    /// This static method fetches the count of all processes that have been linked to a Process ID (PID) within the local scope of the `Registrar`. It is instrumental for gauging how many processes are currently associated with PIDs by the local registrar, providing insights into the registry's utilization and management efficiency.
+    ///
+    /// - Returns: An `Int` representing the total number of processes linked to PIDs in the local registrar.
+    /// - Complexity: O(1), given it merely accesses the count property of the collection containing the processes linked to PIDs.
+    ///
+    /// - Author: Lee Barney
+    /// - Version: 0.9
+    // MARK: - PID-Linked Process Count Retrieval
     static func getNumProcessesLinkedToPid()->Int{
         return Registrar.local.processesLinkedToPid.count
     }
