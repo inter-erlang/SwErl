@@ -111,7 +111,7 @@ public func startEPMD(using conduitType:ExchangeProtocol = .tcp, on port:UInt16 
                         logger?.trace("\(uuid) receiving data")
                         if let data = data, !data.isEmpty {
                             logger?.trace("\(uuid) received \(Array(data)) data")
-                            guard let (requestType,responseData) = dealWithRequest(data:data, uuid: uuid, logger: logger, epmdPort: port) as? (UInt16,Data) else{
+                            guard let (requestType,responseData) = dealWithRequest(data:data, uuid: uuid, logger: logger, epmdPort: port) as? (EPMDCommand,Data) else{
                                 logger?.error("\(uuid) Unable to build response.")
                                 //send nothing so a timeout happens on the remote
                                 return
@@ -120,7 +120,7 @@ public func startEPMD(using conduitType:ExchangeProtocol = .tcp, on port:UInt16 
                             logger?.trace("\(uuid) sending response \(Array(responseData))")
                             aConnection.send(content: responseData, completion: NWConnection.SendCompletion.contentProcessed { error in
                                 logger?.trace("\(uuid) response sent.")
-                                if requestType != 120{//never cancel a AliveX2_Request connection as per documentation.
+                                if requestType != EPMDCommand.stopReq{//never cancel a AliveX2_Request connection as per documentation.
                                     aConnection.cancel()
                                 }
                             })
