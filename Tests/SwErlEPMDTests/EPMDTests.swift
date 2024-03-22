@@ -9,31 +9,6 @@ import XCTest
 import Logging
 @testable import SwErl
 
-final class EPMDTests: XCTestCase {
-
-//    override func setUpWithError() throws {
-//        super.setUp()
-//        mockLogger = MockLogger()
-//    }
-//
-//    override func tearDownWithError() throws {
-//        mockLogger = nil
-//        super.tearDown()
-//    }
-    
-
-    
-
-
-    func testPerformanceExample() throws {
-        // This is an example of a performance test case.
-        self.measure {
-            // Put the code you want to measure the time of here.
-        }
-    }
-
-}
-
 
 
 
