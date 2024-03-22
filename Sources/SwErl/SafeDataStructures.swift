@@ -51,7 +51,7 @@ import Logging
 ///
 /// - Author: Lee Barney
 /// - Version: 0.1
-public enum SafeDictCommand {
+public enum SafeDictionaryCommand {
     case add
     case remove
     case get
@@ -85,19 +85,19 @@ public func buildSafe<K, V>(dictionary: [K: V], named: String) throws {
         guard var rawDictionary = state as? [K: V] else {
             return ((SwErlPassed.fail, SwErlError.invalidState), [K: V]())
         }
-        var command:SafeDictCommand? = nil
+        var command:SafeDictionaryCommand? = nil
         var key:K? = nil
         var value:V? = nil
-        if let (aCommand, aKey, aValue) = message as? (SafeDictCommand, K, V) {
+        if let (aCommand, aKey, aValue) = message as? (SafeDictionaryCommand, K, V) {
             command = aCommand
             key = aKey
             value = aValue
         }
-        else if let (aCommand,aKey) = message as? (SafeDictCommand,K){
+        else if let (aCommand,aKey) = message as? (SafeDictionaryCommand,K){
             command = aCommand
             key = aKey
         }
-        else if let aCommand = message as? SafeDictCommand{
+        else if let aCommand = message as? SafeDictionaryCommand{
             command = aCommand
         }
         else{
@@ -109,26 +109,26 @@ public func buildSafe<K, V>(dictionary: [K: V], named: String) throws {
         var returnValue: Any? = "done"
         let success = SwErlPassed.ok
         switch command {
-        case SafeDictCommand.add:
+        case SafeDictionaryCommand.add:
             guard let key = key, let value = value else{
                 return ((SwErlPassed.fail, SwErlError.invalidMessage), state)
             }
             rawDictionary[key] = value
-        case SafeDictCommand.remove:
+        case SafeDictionaryCommand.remove:
             guard let key = key else{
                 return ((SwErlPassed.fail, SwErlError.invalidMessage), state)
             }
             rawDictionary.removeValue(forKey: key)
-        case SafeDictCommand.get:
+        case SafeDictionaryCommand.get:
                 guard let key = key else{
                     return ((SwErlPassed.fail, SwErlError.invalidMessage), state)
                 }
             returnValue = rawDictionary[key]
-        case SafeDictCommand.getKeys:
+        case SafeDictionaryCommand.getKeys:
             returnValue = Array(rawDictionary.keys)
-        case SafeDictCommand.getValues:
+        case SafeDictionaryCommand.getValues:
             returnValue = Array(rawDictionary.values)
-        case SafeDictCommand.getRaw:
+        case SafeDictionaryCommand.getRaw:
             returnValue = rawDictionary
         }
         let result = ((success, returnValue), rawDictionary)

@@ -64,9 +64,9 @@ import BigInt
 extension Bool {
     var toBoolExt: Data {
         if self == true {
-            return SwErlAtom("true").toAtomExt!
+            return "true".toAtomExt!
         }
-        return SwErlAtom("false").toAtomExt!
+        return "false".toAtomExt!
     }
 }
 
@@ -446,23 +446,19 @@ extension String{
 ///
 /// Example Usage:
 /// ```swift
-/// let atomName = SwErlAtom(name: "example_atom")
-/// let externalRepresentation = atomName.toAtomExt
+/// let externalRepresentation = "example_atom".toAtomExt
 /// ```
 ///
 /// - Complexity: O(n), where n is the length of the atom name in UTF-8 bytes.
 ///
 /// Note: The implementation assumes that the UTF-8 encoded length of the atom name does not exceed `UInt32.max`,
 /// if it does, `nil` is returned.
-extension SwErlAtom{
+extension String{
     var toAtomExt:Data?{
-        guard let asUTF8 = self.utf8 else {
+        guard let asUTF8 = self.data(using: .utf8), asUTF8.count <= UInt32.max, asUTF8.count != 0 else{
             return nil
         }
-        if asUTF8.count > UInt32.max, asUTF8.count == 0{
-            return nil
-        }
-        if asUTF8.count < 255{//max value of byte
+        if asUTF8.count < 255{//max value of byte, small atoms
             return Data([UInt8(119)]) ++ Data([UInt8(asUTF8.count)]) ++ asUTF8
         }
         return Data([UInt8(118)]) ++ Data(UInt32(asUTF8.count).toByteArray).toErlangInterchangeByteOrder ++ asUTF8
@@ -496,7 +492,7 @@ extension SwErlAtom{
 ///
 /// - Author: Lee Barney
 /// - Version: 0.1
-func toNewPidExt(_ PID:Pid,_ nodeName:SwErlAtom)->Data?{
+func toNewPidExt(_ PID:Pid,_ nodeName:String)->Data?{
     let header = Data([UInt8(88)])
     guard let name = nodeName.toAtomExt else{
         return nil
@@ -675,7 +671,7 @@ func toMapExt<T>(_ dict:T)->Data?{
 /// - Version: 0.1
 fileprivate func buildExternalRep(_ element: Any) throws -> Data {
     var ext = Data()
-    if let element = element as? SwErlAtom{
+    if let element = element as? String{
         guard let SwErlAtomExt = element.toAtomExt else{
             throw SwErlError.invalidExternalType
         }

@@ -1,7 +1,7 @@
 {
   "configurations" : [
     {
-      "id" : "A9E0429F-1386-4BE2-B024-45D7B15DC397",
+      "id" : "59DC864E-D08A-4B44-A7F0-CB1A8FA95859",
       "name" : "Test Scheme Action",
       "options" : {
 
@@ -13,22 +13,6 @@
   },
   "testTargets" : [
     {
-      "parallelizable" : true,
-      "target" : {
-        "containerPath" : "container:",
-        "identifier" : "SwErlTests",
-        "name" : "SwErlTests"
-      }
-    },
-    {
-      "parallelizable" : true,
-      "target" : {
-        "containerPath" : "container:",
-        "identifier" : "SwErlStatemTests",
-        "name" : "SwErlStatemTests"
-      }
-    },
-    {
       "target" : {
         "containerPath" : "container:",
         "identifier" : "SwErlEventManagerTests",
@@ -38,8 +22,44 @@
     {
       "target" : {
         "containerPath" : "container:",
-        "identifier" : "GenServerAPITests",
-        "name" : "GenServerAPITests"
+        "identifier" : "SwErlGenServerTests",
+        "name" : "SwErlGenServerTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "SwErlStatemTests",
+        "name" : "SwErlStatemTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "SwErlTests",
+        "name" : "SwErlTests"
+      }
+    },
+    {
+      "enabled" : false,
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "SwErlNodeTests",
+        "name" : "SwErlNodeTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "SwErlEPMDTests",
+        "name" : "SwErlEPMDTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "SwErlTranslationTests",
+        "name" : "SwErlTranslationTests"
       }
     }
   ],

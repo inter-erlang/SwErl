@@ -23,9 +23,9 @@ final class SafeDataStructuresTests: XCTestCase {
     func testBuildSafeAddGet() throws {
         
         try buildSafe(dictionary: [String: Int](), named: "TestDictionary")
-        "TestDictionary" ! (SafeDictCommand.add, "testKey", 1)
+        "TestDictionary" ! (SafeDictionaryCommand.add, "testKey", 1)
         // Verify the state is as expected
-        guard let (success,value) = ("TestDictionary" ! (SafeDictCommand.get, "testKey")) as? (SwErlPassed,Int) else{
+        guard let (success,value) = ("TestDictionary" ! (SafeDictionaryCommand.get, "testKey")) as? (SwErlPassed,Int) else{
             XCTFail()
             return
         }
@@ -36,9 +36,9 @@ final class SafeDataStructuresTests: XCTestCase {
     func testBuildSafeAddGetRaw() throws {
         
         try buildSafe(dictionary: [String: Int](), named: "TestDictionary")
-        "TestDictionary" ! (SafeDictCommand.add, "testKey", 1)
+        "TestDictionary" ! (SafeDictionaryCommand.add, "testKey", 1)
         // Verify the state is as expected
-        guard let (success,dict) = ("TestDictionary" ! (SafeDictCommand.getRaw)) as? (SwErlPassed,[
+        guard let (success,dict) = ("TestDictionary" ! (SafeDictionaryCommand.getRaw)) as? (SwErlPassed,[
             String:Int]) else{
             XCTFail()
             return
@@ -50,12 +50,12 @@ final class SafeDataStructuresTests: XCTestCase {
     
     func testBuildSafeAddRemove() throws {
         try buildSafe(dictionary: [String: Int](), named: "TestDictionary")
-        "TestDictionary" ! (SafeDictCommand.add, "testKey", 1)
+        "TestDictionary" ! (SafeDictionaryCommand.add, "testKey", 1)
         // Verify the state is as expected
-        let (success,_) = ("TestDictionary" ! (SafeDictCommand.remove,"testKey"))
+        let (success,_) = ("TestDictionary" ! (SafeDictionaryCommand.remove,"testKey"))
         XCTAssertEqual(SwErlPassed.ok, success)
         
-        guard let (rawSuccess,rawDict) = ("TestDictionary" ! (SafeDictCommand.getRaw)) as? (SwErlPassed,[
+        guard let (rawSuccess,rawDict) = ("TestDictionary" ! (SafeDictionaryCommand.getRaw)) as? (SwErlPassed,[
             String:Int]) else{
             XCTFail()
             return
@@ -71,7 +71,7 @@ final class SafeDataStructuresTests: XCTestCase {
         
         try buildSafe(dictionary: dictionary, named: name)
         // Verify the state is as expected
-        guard let (success,value) = ("TestDictionary" ! (SafeDictCommand.get, "testKey")) as? (SwErlPassed,Int) else{
+        guard let (success,value) = ("TestDictionary" ! (SafeDictionaryCommand.get, "testKey")) as? (SwErlPassed,Int) else{
             XCTFail()
             return
         }
@@ -85,7 +85,7 @@ final class SafeDataStructuresTests: XCTestCase {
         
         try buildSafe(dictionary: dictionary, named: name)
         
-        guard let (success,keys) = ("TestDictionary" ! SafeDictCommand.getKeys) as? (SwErlPassed,[String]) else{
+        guard let (success,keys) = ("TestDictionary" ! SafeDictionaryCommand.getKeys) as? (SwErlPassed,[String]) else{
             XCTFail()
             return
         }
@@ -100,7 +100,7 @@ final class SafeDataStructuresTests: XCTestCase {
         let name = "TestDictionary"
         
         try buildSafe(dictionary: dictionary, named: name)
-        guard let (success,keys) = ("TestDictionary" ! SafeDictCommand.getValues) as? (SwErlPassed,[Int]) else{
+        guard let (success,keys) = ("TestDictionary" ! SafeDictionaryCommand.getValues) as? (SwErlPassed,[Int]) else{
             XCTFail()
             return
         }
@@ -114,7 +114,7 @@ final class SafeDataStructuresTests: XCTestCase {
         let dictionary = ["testKey": 1]
         
         try buildSafe(dictionary: dictionary, named: "TestDictionary")
-        guard let (success,rawDict) = ("TestDictionary" ! (SafeDictCommand.getRaw)) as? (SwErlPassed,[
+        guard let (success,rawDict) = ("TestDictionary" ! (SafeDictionaryCommand.getRaw)) as? (SwErlPassed,[
             String:Int]) else{
             XCTFail()
             return

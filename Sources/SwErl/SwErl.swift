@@ -183,7 +183,7 @@ public struct Pid: Hashable, Equatable {
 ///
 
 public struct SwErlRef: Hashable, Equatable {
-    let node: SwErlAtom
+    let node: String
     let id: UInt32
     let creation: UInt32
     
@@ -202,66 +202,11 @@ public struct SwErlRef: Hashable, Equatable {
 /// - Version: 0.1
 ///
 public struct SwErlNewerRef: Hashable, Equatable {
-    let node: SwErlAtom
+    let node: String
     let creation:UInt32
     let id: Data
 }
 
-/// Structure representing an Erlang-like atom in SwErl.
-///
-/// - Note: The `SwErlAtom` structure conforms to the `Hashable` and `Equatable` protocols.
-///
-/// - Property:
-///   - `value`: The string value of the atom, stored in a lowercase form. It is optional, allowing for an uninitialized state.
-///
-/// - Author: Lee S. Barney
-/// - Version: 0.1
-///
-/// - Important: The `SwErlAtom` structure provides an initializer that accepts a string value. If the string is empty, the `value` property is set to `nil`.
-///   Otherwise, the lowercase version of the string is stored in the `value` property.
-// MARK: SwErlAtom
-public struct SwErlAtom: Hashable, Equatable {
-    private var value: String?
-    
-    /// Initializes an atom with the provided string value.
-    ///
-    /// - Parameter value: The string value to be associated with the Atom.
-    init(_ value: String) {
-        if value.isEmpty {
-            self.value = nil
-        }
-        else{
-            self.value = value.lowercased()
-        }
-    }
-}
-/// Extension on `SwErlAtom` providing a computed property to get the string value.
-///
-/// - Note: The `string` property returns the optional string value stored in the `SwErlAtom`.
-///
-/// - Author: Lee S. Barney
-/// - Version: 0.1
-///
-/// - Returns: The optional string value of the `SwErlAtom`.
-public extension SwErlAtom {
-    var string: String? {
-        return self.value
-    }
-}
-
-/// Extension on `SwErlAtom` providing a computed property to get the string value as a `Data` in UTF8.
-///
-/// - Note: The `utf8` property returns the optional string value stored in the `SwErlAtom`.
-///
-/// - Author: Lee S. Barney
-/// - Version: 0.1
-///
-/// - Returns: An optional `Data` value of the `SwErlAtom`.
-public extension SwErlAtom{
-    var utf8: Data?{
-        return self.value?.data(using: .utf8)
-    }
-}
 
 /// Represents a bit string with a specified bit count and internal byte data.
 ///
@@ -288,8 +233,8 @@ struct BitString: Hashable, Equatable {
 /// - Version: 0.1
 ///
 struct SwErlExportFunc: Hashable, Equatable  {
-    let module: SwErlAtom
-    let function: SwErlAtom
+    let module: String
+    let function: String
     let arity: Int
 }
 
@@ -318,7 +263,7 @@ struct SwErlBitBinary: Hashable, Equatable  {
 struct SwErlPort: Hashable, Equatable  {
     
     /// The node associated with the port.
-    let node: SwErlAtom
+    let node: String
     
     /// The port ID as a 32-bit unsigned integer.
     let ID: UInt32
@@ -338,7 +283,7 @@ struct SwErlPort: Hashable, Equatable  {
 struct SwErlNewPort: Hashable, Equatable  {
     
     /// The node associated with the new port.
-    let node: SwErlAtom
+    let node: String
     
     /// The port ID as a 32-bit unsigned integer.
     let ID: UInt32
@@ -357,7 +302,7 @@ struct SwErlNewPort: Hashable, Equatable  {
 struct SwErlV4Port: Hashable, Equatable  {
     
     /// The node associated with the port.
-    let node: SwErlAtom
+    let node: String
     
     /// The port ID as a 64-bit unsigned integer.
     let ID: UInt64
@@ -649,39 +594,6 @@ extension String {
             return (SwErlPassed.fail,SwErlError.notRegisteredByName)
         }
         return pid ! rhs
-    }
-}
-
-/// Facade function for invoking functions on a process identified by a `SwErlAtom`.
-///
-/// - Complexity:
-///   - Time: O(1) - The function execution time is constant and does not depend on the size of the data being processed.
-///   - Space: O(1) - The memory usage is constant, and no additional data structures are created.
-///
-/// This function uses the `!` operator with a `SwErlAtom` operand.
-///
-/// - Parameters:
-///   - lhs: The left-hand side operand, a `SwErlAtom`.
-///   - rhs: The right-hand side operand, a message of type `Any` to be processed by the process.
-///
-/// - Returns:
-///   A `SwErlResponse` tuple containing the result of executing the closure. The first element of the tuple represents the execution status (`SwErlPassed.ok` or `SwErlPassed.fail`), and the second element is a `SwErlError?` indicating any error that occurred during execution or `nil` if there was no error .
-///
-/// - Important:
-///   If a stateful process has nil as it's state, the stateful lambda will be passed an empty tuple as the state to use.
-///
-/// - Note:
-///   This function relies on the `!` operator for `Pid` and the `String` extension to perform the actual invocation based on the process identified by its registered name.
-///
-/// - Author: Lee S. Barney
-/// - Version: 0.1
-// MARK: SwErlAtom
-extension SwErlAtom {
-    @discardableResult public static func !( lhs: SwErlAtom, rhs: Any)->SwErlResponse{
-        guard let atomName = lhs.string else {
-            return (SwErlPassed.fail,SwErlError.badAtom)
-        }
-        return atomName ! rhs
     }
 }
 

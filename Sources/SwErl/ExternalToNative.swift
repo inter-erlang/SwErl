@@ -85,7 +85,7 @@ extension Data {
     /// ---------------------------
     /// where length is the number of bytes in .utf8.
     
-    var fromSmallAtomUTF8Ext: (SwErlAtom, Data)? {
+    var fromSmallAtomUTF8Ext: (String, Data)? {
         get {
             guard let byteCount = self.first else {
                 return nil
@@ -96,7 +96,7 @@ extension Data {
                 return nil
             }
             reduced = reduced.dropFirst(numBytes)
-            return (SwErlAtom(result), Data(reduced))
+            return (result, Data(reduced))
         }
     }
     
@@ -109,7 +109,7 @@ extension Data {
     /// value |   118 | length | AtomName |
     /// ---------------------------
     /// where length is the number of bytes in .utf8.
-    var fromAtomUTF8Ext: (SwErlAtom, Data)? {
+    var fromAtomUTF8Ext: (String, Data)? {
         get {
             guard self.count >= 4 else {
                 return nil
@@ -120,7 +120,7 @@ extension Data {
                 return nil
             }
             reduced = reduced.dropFirst(nameLength)
-            return (SwErlAtom(result), Data(reduced))
+            return (result, Data(reduced))
         }
     }
 }
@@ -418,8 +418,7 @@ extension Data {
         get {
             // First, decode the node name from its external representation.
             guard let (atom, reducedResult) = consumeExternal(rep: self),
-                  let node = atom as? SwErlAtom,
-                  let nodeName = node.string,
+                  let nodeName = atom as? String,
                   reducedResult.count >= 12 // Ensure enough data for ID, Serial, and Creation
             else {
                 return nil
@@ -471,8 +470,7 @@ extension Data {
         get {
             // Decode the node name from its external representation.
             guard let (atom, reducedResult) = consumeExternal(rep: self),
-                  let node = atom as? SwErlAtom,
-                  let nodeName = node.string,
+                  let nodeName = atom as? String,
                   reducedResult.count >= 9 // Ensure enough data for ID, Serial, and Creation
             else {
                 return nil
@@ -803,8 +801,7 @@ extension Data {
         }
         // Next, read the atom
         guard let (atom, reducedResult) = consumeExternal(rep: self),
-              let node = atom as? SwErlAtom,
-              node.string != nil,
+              let node = atom as? String,
               reducedResult.count >= 9
         else {
             return nil
@@ -878,8 +875,7 @@ extension Data {
         var reduced = self.dropFirst(2)
         // Next, read the atom
         guard let (atom, reducedResult) = consumeExternal(rep: reduced),
-              let node = atom as? SwErlAtom,
-              node.string != nil,
+              let node = atom as? String,
               reducedResult.count >= 4
         else {
             return nil
@@ -940,12 +936,12 @@ extension Data {
             return nil
         }
         guard let (possibleModule, moduleReduced) = consumeExternal(rep: self),
-              let module = possibleModule as? SwErlAtom
+              let module = possibleModule as? String
         else {
             return nil
         }
         guard let (possibleFunction, functionReduced) = consumeExternal(rep: moduleReduced),
-              let function = possibleFunction as? SwErlAtom
+              let function = possibleFunction as? String
         else {
             return nil
         }
@@ -954,7 +950,7 @@ extension Data {
         else {
             return nil
         }
-        return (SwErlExportFunc(module: module, function: function, arity: arity), arityReduced)
+        return (SwErlExportFunc(module: module.lowercased(), function: function.lowercased(), arity: arity), arityReduced)
     }
 }
 
@@ -1054,8 +1050,7 @@ extension Data {
     var fromPortExt: (SwErlPort, Data)? {
         // First, read the atom
         guard let (atom, reducedResult) = consumeExternal(rep: self),
-              let node = atom as? SwErlAtom,
-              node.string != nil,
+              let node = atom as? String,
               reducedResult.count >= 4
         else {
             return nil
@@ -1102,8 +1097,7 @@ extension Data {
     var fromNewPortExt: (SwErlNewPort, Data)? {
         // First, read the atom
         guard let (atom, reducedResult) = consumeExternal(rep: self),
-              let node = atom as? SwErlAtom,
-              node.string != nil,
+              let node = atom as? String,
               reducedResult.count >= 4
         else {
             return nil
@@ -1151,8 +1145,7 @@ extension Data {
     var fromV4PortExt: (SwErlV4Port, Data)? {
         // First, read the atom
         guard let (atom, reducedResult) = consumeExternal(rep: self),
-              let node = atom as? SwErlAtom,
-              node.string != nil,
+              let node = atom as? String,
               reducedResult.count >= 4
         else {
             return nil
