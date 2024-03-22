@@ -108,16 +108,13 @@ final class NodeAliveTests: XCTestCase {
     }
 
     func testDoAliveX_DataTooShort_LogsErrorAndReturnsErrorData() {
-        let mockCreation:UInt32 = 15
         let portNum:UInt16 = 5678
         let nodeType:UInt8 = NodeType.normalNode.rawValue
         let comProtocol:UInt8 = ConnectionProtocol.tcpIPv4.rawValue
         let highestVersion:UInt16 = 27
         let lowestVersion:UInt16 = 25
         let nodeName = "none such"
-        let nameLength = nodeName.count
         let extraData = "Extra Data".data(using: .utf8)!
-        let extraLength:UInt16 = UInt16(extraData.count)
         
         let shortData = Data(portNum.toErlangInterchangeByteOrder.toByteArray) ++ Data([nodeType]) ++ Data([comProtocol]) ++ Data(highestVersion.toErlangInterchangeByteOrder.toByteArray) ++ Data(lowestVersion.toErlangInterchangeByteOrder.toByteArray)// Data shorter than 10 bytes
         let uuid = "testUUID"
@@ -260,7 +257,6 @@ final class DealWithRequestTests: XCTestCase {
     
     func testDealWithRequest_Alive2Request_ValidData() {
         // setup
-        let mockCreation:UInt32 = 15
         let portNum:UInt16 = 5678
         let nodeType:UInt8 = NodeType.normalNode.rawValue
         let comProtocol:UInt8 = ConnectionProtocol.tcpIPv4.rawValue
@@ -275,7 +271,7 @@ final class DealWithRequestTests: XCTestCase {
         let uuid = "testUUID"
         let epmdPort: UInt16 = 4369
         
-        let result = doAliveX(data: requestData, uuid: uuid, logger: nil)
+        _ = doAliveX(data: requestData, uuid: uuid, logger: nil)
         // Construct valid data for an alive2Request
         let commandByte = EPMDCommand.alive2Request.rawValue
         requestData = Data([0, 0, commandByte]) ++ requestData//the first two bytes are ignored
