@@ -1,5 +1,5 @@
 ![SwErl](Sources/SwErl/SwErl.docc/resources/logo_text.svg)
-SwErl is a general purpose concurrency library conforming to the design patterns and principles found in the Erlang Programming Language. SwErl also includes SwErl Node, an as-of-yet incomplete library allowing native Swift to connect to a distributed Erlang system as a near-fully featured node. For Swift Developers with little to no Erlang experience, a quick primer for SwErl [is provided here.](Sources/SwErl/SwErl/docc/BasicUsage.md) 
+SwErl is a general purpose concurrency library conforming to the design patterns and principles found in the Erlang Programming Language. SwErl also includes SwErl Node, an as-of-yet incomplete library allowing native Swift to connect to a distributed Erlang system as a near-fully featured node. For Swift Developers with little to no Erlang experience, a quick primer for SwErl [is provided here](Sources/SwErl/SwErl.docc/GettingStarted.md).
 ## Why SwErl?
 
 ### Painless Concurrency
