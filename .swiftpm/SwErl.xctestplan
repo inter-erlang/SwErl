@@ -36,10 +36,25 @@
       }
     },
     {
+      "enabled" : false,
       "target" : {
         "containerPath" : "container:",
         "identifier" : "GenServerAPITests",
         "name" : "GenServerAPITests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "SwErlGenServerTests",
+        "name" : "SwErlGenServerTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "SwErlNodeTests",
+        "name" : "SwErlNodeTests"
       }
     }
   ],

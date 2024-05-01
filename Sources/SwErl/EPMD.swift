@@ -117,6 +117,7 @@ public func startEPMD(using conduitType:ExchangeProtocol = .tcp, on port:UInt16 
         connectionListener.newConnectionHandler = { aConnection in
             let uuid = UUID().uuidString
             aConnection.stateUpdateHandler = { aState in
+                print("state: \(aState)")
                 switch aState {
                 case .ready:
                     logger?.trace("Client connected. Assigned UUID \(uuid)")
@@ -131,29 +132,43 @@ public func startEPMD(using conduitType:ExchangeProtocol = .tcp, on port:UInt16 
                                 return
                                 
                             }
+                            
                             logger?.trace("\(uuid) sending response \(Array(responseData))")
                             aConnection.send(content: responseData, completion: NWConnection.SendCompletion.contentProcessed { error in
                                 logger?.trace("\(uuid) response sent.")
-                                if requestType != 120{//never cancel a AliveX2_Request connection as per documentation.
+                                if requestType == 120{//keep connection open until remote terminates
+                                    aConnection.waitForTermination(logger: logger, uuid: uuid)
+                                }
+                                else{
                                     aConnection.cancel()
                                 }
                             })
+                            
                         }
                     }
                 case .failed(let error):
-                    logger?.trace("\(uuid) connection failed: \(error)")
+                    logger?.trace("!!!!!!!!!!!!!!!!!!!\(uuid) connection failed: \(error)")
+                    //clean up node alive record if the connection
+                    //is the one used to originally store the
+                    //NodeAlive data.
+                    guard let (_,name) = ("UUIDNameTracker" ! (SafeDictCommand.get,uuid)) as? (SwErlPassed,String) else{
+                        logger?.trace("\(uuid) connection not found in uuid-name tracker.")
+                        return
+                    }
+                    "nameNodeAliveTracker" ! (Tracker.remove, name)
                     
                 case .cancelled:
                     logger?.trace("\(uuid) EPMD connection canceled")
                     //clean up node alive record if the connection
                     //is the one used to originally store the
                     //NodeAlive data.
-                    guard let (_,name) = ("UUIDNameTracker" ! (Tracker.get,uuid,nil as String?)) as? (SwErlPassed,String) else{
+                    guard let (success,name) = ("UUIDNameTracker" ! (SafeDictCommand.get,uuid)) as? (SwErlPassed,String) else{
                         logger?.trace("\(uuid) connection not found in uuid-name tracker.")
                         return
                     }
-                    "nameNodeAliveTracker" ! (Tracker.remove, name, nil as NodeAlive?)
+                    "nameNodeAliveTracker" ! (SafeDictCommand.remove, name)
                 default:
+                    logger?.trace("connection state changed to \(aState)")
                     break
                 }
             }
@@ -304,9 +319,8 @@ fileprivate func doPortPlease(bytes:Data, id:String, logger:Logger? = nil) -> Da
 /// - Version: 0.1
 
 fileprivate func doNamesReq(port:UInt32, id:String, logger:Logger?) -> Data{
-    let nilInfo:Any? = nil
     let portData = Data(port.toErlangInterchangeByteOrder.toByteArray)
-    let allValues = "nameNodeAliveTracker" ! (Tracker.getAll,nilInfo,nilInfo)
+    let allValues = "nameNodeAliveTracker" ! (SafeDictCommand.getValues)
     guard let (_,allNodeAlives) = allValues as? (SwErlPassed,[NodeAlive]) else{
         logger?.error("names request failed. Incorrect request result \(allValues)")
         return portData
@@ -345,7 +359,7 @@ fileprivate func doNamesReq(port:UInt32, id:String, logger:Logger?) -> Data{
 /// - Author: Lee S. Barney
 /// - Version: 0.1
 
-fileprivate func doAliveX(data:Data, uuid:String, logger:Logger? = nil) -> Data{
+fileprivate func doAliveX(data:Data, uuid:String, logger:Logger? = nil) -> Data?{
     logger?.trace("\(uuid) alive request data \(Array(data))")
     let errorArray = [Byte(118),Byte(1)] + UInt32(1).toErlangInterchangeByteOrder.toByteArray
     let errorData = Data(errorArray)
@@ -383,6 +397,11 @@ fileprivate func doAliveX(data:Data, uuid:String, logger:Logger? = nil) -> Data{
         logger?.error("\(uuid) unable to convert \(remaining.prefix(nameLength)) to UTF8")
         return errorData
     }
+    //if the name is already found return error
+    guard case (_,nil) = "nameNodeAliveTracker" ! (SafeDictCommand.get,name)else{
+        return errorData
+    }
+
     remaining = remaining.dropFirst(nameLength)
     let extrasLength = Int(remaining.prefix(2).toMachineByteOrder.toUInt16)
     remaining = remaining.dropFirst(2)
@@ -397,13 +416,43 @@ fileprivate func doAliveX(data:Data, uuid:String, logger:Logger? = nil) -> Data{
     }
     let anAlive = NodeAlive(portNumber: portNum, nodeType: nodeType, comProtocol: communicationProtocol, highestVersion: highestVersion, lowestVersion: lowestVersion, nodeName: SwErlAtom(name), extra: extras)
     logger?.trace("\(uuid) generated alive \(anAlive)")
-    "nameNodeAliveTracker" ! (Tracker.add, name, anAlive)
-    "UUIDNameTracker" ! (Tracker.add,uuid,name)
+    "nameNodeAliveTracker" ! (SafeDictCommand.add, name, anAlive)
+    "UUIDNameTracker" ! (SafeDictCommand.add,uuid,name)
     logger?.trace("creation: \(creation) generated for \(uuid)")
     responseArray = responseArray +  creation.toErlangInterchangeByteOrder.toByteArray //creation data
     
     return  Data(responseArray)
 }
+
+/// Listens for termination of a network connection and logs the event or any unexpected data received.
+/// This method blocks the node alive connection's thread until the connection either receives data, which it never should at this point, or the connection is terminated.
+///
+/// - Parameters:
+///   - logger: An optional `Logger` instance to log information and errors.
+///   - uuid: A unique identifier for the logging session to trace specific connection activities.
+///
+/// This method utilizes a semaphore to manage synchronization. It waits on the semaphore after initiating the data reception, and signals the semaphore upon data reception or when an error occurs. The method ensures that it only returns after the connection has either received data or terminated by calling `cancel` on the connection.
+///
+/// - Complexity: O(1), as it involves straightforward semaphore operations and message handling.
+///
+/// - Author: Lee Barney
+/// - Version: 0.1
+extension NWConnection{
+    func waitForTermination(logger:Logger?, uuid:String){
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        self.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, isComplete, error in
+            if let data = data, !data.isEmpty {
+                logger?.error("\(uuid) received unexpected data \(data)")
+            }
+            logger?.trace("\(uuid) connection terminated")
+            semaphore.signal() // Signal that data has been received or an error occurred
+            self.cancel()
+        }
+        semaphore.wait() // Block here until the semaphore is signaled
+    }
+}
+
 /// Extends the `NodeAlive` structure to include a method for converting its properties to an instance of the `Data` class.
 /// This extension provides a way to serialize a `NodeAlive` instance into a `Data` object suitable for network transmission. The serialization includes the node's port number, type, communication protocol, highest and lowest version numbers, node name, and any extra information. If the node name cannot be encoded, a failure response is generated instead.
 ///
@@ -424,7 +473,17 @@ extension NodeAlive{
     }
 }
 
-
+/// Determines whether the default protocol stack of the exchange protocol uses TCP.
+/// This property checks if the top-most transport protocol in the stack is TCP by comparing it to `NWProtocolTCP.Options`.
+///
+/// This approach assumes that the primary transport protocol in the stack determines the nature of the connection. It is important to ensure that the transport protocol stack is correctly configured before relying on this property.
+///
+/// - Returns: A Boolean value indicating whether TCP is the transport protocol in use.
+///
+/// - Complexity: O(1) as it only involves a type check.
+///
+/// - Author: Lee Barney
+/// - Version: 0.1
 extension ExchangeProtocol {
     var usesTCP: Bool {
         // Check the first protocol in the transport protocol stack
