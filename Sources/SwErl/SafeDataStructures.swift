@@ -58,6 +58,7 @@ public enum SafeDictCommand {
     case getKeys
     case getValues
     case getRaw
+    case clear
 }
 
 
@@ -130,7 +131,10 @@ func buildSafe<K, V>(dictionary: [K: V], named: String) throws {
             returnValue = Array(rawDictionary.values)
         case SafeDictCommand.getRaw:
             returnValue = rawDictionary
+        case SafeDictCommand.clear:
+            rawDictionary.removeAll()
         }
+    
         let result = ((success, returnValue), rawDictionary)
         return result
     }

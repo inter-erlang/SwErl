@@ -60,7 +60,7 @@ public enum Tracker {
 ///
 /// - Properties:
 ///   - portNumber: The port number on which the Erlang node is listening.
-///   - nodeType: The type of the Erlang node, typically indicating whether it is a hidden node or a regular node.
+///   - nodeType: The type of the Erlang node, typically indicating whether it is a hidden node or a regular node. Valid values are 77 (normal) and 72(hidden)
 ///   - comProtocol: The communication protocol used by the node, such as TCP or UDP.
 ///   - highestVersion: The highest version of the Erlang distribution protocol that the node supports.
 ///   - lowestVersion: The lowest version of the Erlang distribution protocol that the node supports.
@@ -286,7 +286,7 @@ fileprivate func dealWithRequest(data:Data?, uuid:String, logger:Logger?, epmdPo
 /// - Author: Lee S. Barney
 /// - Version: 0.1
 
-fileprivate func doPortPlease(bytes:Data, id:String, logger:Logger? = nil) -> Data{
+func doPortPlease(bytes:Data, id:String, logger:Logger? = nil) -> Data{
     let failureResponse = Data([119,1])
     
     logger?.trace("connection \(id) building portPlease response")
@@ -295,7 +295,7 @@ fileprivate func doPortPlease(bytes:Data, id:String, logger:Logger? = nil) -> Da
         return failureResponse
     }
     logger?.trace("connection \(id) requesting port for \(requestedNodeName)")
-    let (success,result) = "nameNodeAliveTracker" ! (Tracker.get, requestedNodeName, nil as NodeAlive?)
+    let (success,result) = "nameNodeAliveTracker" ! (SafeDictCommand.get, requestedNodeName)
     guard success == SwErlPassed.ok, let alive = result as? NodeAlive else{
         logger?.error("\(id) NodeAlive not found for \(requestedNodeName) for port please request.")
         return failureResponse
@@ -318,12 +318,13 @@ fileprivate func doPortPlease(bytes:Data, id:String, logger:Logger? = nil) -> Da
 /// - Author: Lee S. Barney
 /// - Version: 0.1
 
-fileprivate func doNamesReq(port:UInt32, id:String, logger:Logger?) -> Data{
+func doNamesReq(port:UInt32, id:String, logger:Logger?) -> Data{
+    logger?.trace("\(id) doing names request")
     let portData = Data(port.toErlangInterchangeByteOrder.toByteArray)
     let allValues = "nameNodeAliveTracker" ! (SafeDictCommand.getValues)
     guard let (_,allNodeAlives) = allValues as? (SwErlPassed,[NodeAlive]) else{
-        logger?.error("names request failed. Incorrect request result \(allValues)")
-        return portData
+        logger?.error("\(id) cames request failed. Incorrect request result \(allValues)")
+        return Data()
     }
     let namesListString = allNodeAlives.reduce(""){accum, nodeAlive in
         guard let name = nodeAlive.nodeName.string else{
@@ -332,10 +333,10 @@ fileprivate func doNamesReq(port:UInt32, id:String, logger:Logger?) -> Data{
         return accum.appending("name \(name) at port \(nodeAlive.portNumber)\n")
     }
     
-    logger?.trace("all NodeInfo string: \(namesListString)")
+    logger?.trace("\(id) cll NodeInfo string: \(namesListString)")
     
     guard var asData = namesListString.data(using: .utf8) else{
-        logger?.error("connection \(id) unable to generate names list data from string \(namesListString)")
+        logger?.error("\(id) unable to generate names list data from string \(namesListString)")
         
         return portData
     }
