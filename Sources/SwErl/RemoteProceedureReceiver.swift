@@ -290,12 +290,25 @@ func doHandshake(uuid:String,localNodeName:String, cookie:String,data:Data,conne
 
 fileprivate func doRPCResponse(uuid:String, connection:NWConnection, status:Status,logger:Logger? = nil) {
     connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, _, error in
-        guard var data = data, data.count >= 3 else{
+        guard let data = data, data.count >= 3 else{
             logger?.trace("connection \(uuid) got invalid waitForData data")
             doRPCResponse(uuid: uuid, connection: connection, status: status, logger:logger)
             return
         }
         logger?.trace("connection \(uuid) request data \(Array(data))")
+        
+        //the message may be a 'is_alive' message consisting of 4 bytes that are all zeros. If so, short circut any further computation and send an 'is_alive' response.
+        guard data.count != 4,data.prefix(4) != Data([0,0,0,0]) else{
+            connection.send(content: data, completion: .contentProcessed { error in
+                            if let error = error {
+                                logger?.error("\(uuid) failed to send is_alive response: \(error)")
+                            } else {
+                                logger?.trace("\(uuid) sent is_alive response")
+                            }
+                        })
+            return
+        }
+        
         readDistributionMessage(connection: connection, message: data, uuid: uuid, logger: logger)
         
 //        guard var (atomCacheRefs,flags,remainingData) = decodeDistributionHeader(data: data, uuid: uuid, connection: connection, status: status, logger: logger) else{
