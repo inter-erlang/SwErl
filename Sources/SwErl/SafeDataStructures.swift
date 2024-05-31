@@ -54,6 +54,7 @@ import Logging
 public enum SafeDictCommand {
     case add
     case remove
+    case removePair
     case get
     case getKeys
     case getValues
@@ -125,6 +126,14 @@ func buildSafe<K, V>(dictionary: [K: V], named: String) throws {
                     return ((SwErlPassed.fail, SwErlError.invalidMessage), state)
                 }
             returnValue = rawDictionary[key]
+        case SafeDictCommand.removePair:
+            guard let toRemove = key as? V else{
+                return ((SwErlPassed.fail, SwErlError.invalidMessage), state)
+            }
+            if let key = rawDictionary.first(where: { $0.value == toRemove })?.key {
+                rawDictionary.removeValue(forKey: key)
+                }
+            returnValue = rawDictionary
         case SafeDictCommand.getKeys:
             returnValue = Array(rawDictionary.keys)
         case SafeDictCommand.getValues:

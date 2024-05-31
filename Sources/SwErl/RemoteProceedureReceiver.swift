@@ -397,15 +397,66 @@ fileprivate func readNormalMessage(connection:NWConnection, message:Data, ofLeng
         numAtomCacheRefs = numAtomCacheRefs - existingCacheRefCount
         remainingMessage = updateAtomCache(message: remainingMessage, cacheRefCount: numAtomCacheRefs, pairAtomCache: pairAtomCache as! NodePairAtomCache, longAtoms: usesLongAtoms, uuid: uuid, logger: logger)
 
-        let (control,remainingMessage) = decodeControlMessage(data: remainingMessage, uuid: uuid, logger: logger)
+        guard let ((controlData,controlType),remainingMessage) = decodeControlMessage(data: remainingMessage, uuid: uuid, logger: logger) as? ((Any,UInt8),Data) else{
+            logger?.error("connection \(uuid) bad control message in rpc request")
+            return
+        }
+        guard !remainingMessage.isEmpty && remainingMessage.firstByte == 140 else{
+            logger?.info("connection \(uuid) has no message payload after control message")
+            return
+        }
+        guard var (payloadData,remainingMessage) = consumeExternal(rep: remainingMessage) else{
+            logger?.info("connection \(uuid) has bad message payload after control message")
+            return
+        }
+        
+        //act on request
+        switch controlType {
+        case ERL.REG_SEND:
+            guard let (remotePid,remoteName) = controlData as? (Pid,String) else{
+                logger?.info("connection \(uuid) has bad control message data")
+                return
+            }
+            guard let (pid,atomCacheRef) = payloadData as? (Pid,UInt8) else{
+                logger?.info("connection \(uuid) has bad message payload data")
+                return
+            }
+            let (found,name) = "atom_cache" ! (SafeDictCommand.get,atomCacheRef)
+            guard found == SwErlPassed.ok, let name = name as? String else{
+                logger?.info("connection \(uuid) has bad atom in message payload")
+                return
+            }
+            "connection_cache" ! (SafeDictCommand.add, name, connection)//store the connection so the name can be used in SwErl code to send an rpc request to the node via the long-lived connection
+            // MARK: Update of Connection State Handler
+            //update the state listener for the connection so the connection can be appropriately removed from the connection_cache.
+            connection.stateUpdateHandler = { aState in
+                switch aState {
+                case .ready:
+                    logger?.trace("Client connected. Assigned UUID \(uuid) to node name \(name)")
+                    
+                case .failed(let error):
+                    logger?.trace("connection \(uuid) connection failed: \(error)")
+                    "atom_cache" ! (SafeDictCommand.remove,uuid)
+                    "connection_cache" ! (SafeDictCommand.remove, name)
+                case .cancelled:
+                    logger?.trace("connection \(uuid) connection cancelled.")
+                    "atom_cache" ! (SafeDictCommand.remove,uuid)
+                    "connection_cache" ! (SafeDictCommand.remove, name)
+                default:
+                    logger?.trace("connection \(uuid) connection in unrecognized state \(aState)")
+                    break
+                }
+            }
+            
+            //respond to request using data provided
+        default:
+            //do something
+            logger?.error("\(uuid) request contained bad control type indicator \(controlType)")
+        }
         
         //act on control message
         
-        if !remainingMessage.isEmpty && remainingMessage.firstByte == 140{
-           //var (message,remainingMessage) = decodeMessage(message: remainingMessage, uuid: uuid, logger:logger)
-            
-            //act on request
-        }
+        
         
         
         if remainingMessage.count > 0{
@@ -503,7 +554,7 @@ fileprivate func decodeDistributionHeader(data:Data, uuid:String, connection:NWC
     return nil
 }
 
-func decodeControlMessage(data: Data, uuid: String, logger: Logger?)->(Any?,Data){
+func decodeControlMessage(data: Data, uuid: String, logger: Logger?)->((Any,UInt8)?,Data){
     guard data.firstByte == 104 else {//the control message must always be an encoded tuple according to the documentation.
         return (nil,data)
     }
@@ -529,11 +580,13 @@ func decodeControlMessage(data: Data, uuid: String, logger: Logger?)->(Any?,Data
             return (nil,remainingData)//place holder code
             //case ERL.UNLINK://(Obsolete)
         case ERL.NODE_LINK:
-            return ((5),remainingData)
+            return ((5,ERL.NODE_LINK),remainingData)
         case ERL.REG_SEND:
             //the next three items are FromPid, Unused, and ToName
-            //remainingData = remainingData.fromNewPidExt
-            return (nil,remainingData)//place holder code
+            guard let result = remainingData.fromNewPidExt else{
+                return (nil,remainingData)//place holder code
+            }
+            return ((result,ERL.REG_SEND),remainingData)
         case ERL.GROUP_LEADER:
             //the next two items are FromPid and ToPid
             return (nil,remainingData)//place holder code
@@ -613,7 +666,6 @@ func decodeControlMessage(data: Data, uuid: String, logger: Logger?)->(Any?,Data
     }
     return (nil,data)
 }
-
 
 //func doHandshake(uuid:String,localNodeName:String, cookie:String,data:Data,connection:NWConnection,epmdPort:UInt16 = 4369,creation:UInt32,logger:Logger?) {
 //    let uuid = UUID().uuidString

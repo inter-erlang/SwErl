@@ -36,6 +36,7 @@ enum Node{
         //start Atom Cache Map
         do{
             try buildSafe(dictionary: [String:NodePairAtomCache](), named: "atom_cache")
+            try buildSafe(dictionary: [String:NWConnection](), named: "connection_cache")
         }
         catch{}
         //start Remote Proceedure Receiver
