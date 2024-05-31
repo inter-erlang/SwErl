@@ -11,10 +11,9 @@ import XCTest
 class PortPleaseTests: XCTestCase {
     let validAlive = NodeAlive(portNumber: 23, nodeType: 77, comProtocol: 0, highestVersion: 6, lowestVersion: 6, nodeName: SwErlAtom("bob"), extra: Data())
     override func setUp()  {
-        print("!!!!!!!!!!!!!building alive tracker!!!!!!!!!!!!!!")
+        "nameNodeAliveTracker" ! SafeDictCommand.clear
         do{
-            let initalState:[String:NodeAlive] = ["someName":validAlive]
-            try buildSafe(dictionary: initalState, named: "nameNodeAliveTracker")
+            try buildSafe(dictionary: [String:NodeAlive](), named: "nameNodeAliveTracker")
         }
         catch{
             //if the name is already linked, an error is thrown.
@@ -25,6 +24,7 @@ class PortPleaseTests: XCTestCase {
         let bytes = Data("someName".utf8)
         let trackingID = "123"
         
+        "nameNodeAliveTracker" ! (SafeDictCommand.add,"someName",validAlive)
         let result = doPortPlease(bytes: bytes, id: trackingID, logger: nil)
         XCTAssertEqual(result, expectedBytes)
     }

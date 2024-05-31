@@ -211,8 +211,36 @@ extension EPMDMessageComponent{
 }
 
 struct ERL {
-    static let UNLINK_ID =         35
-    static let UNLINK_ID_ACK =     36
+    static let LINK:UInt8 =              1
+    static let SEND:UInt8 =              2
+    static let EXIT:UInt8 =              3
+    static let UNLINK:UInt8 =            4//OBSOLETE
+    static let NODE_LINK:UInt8 =         5
+    static let REG_SEND:UInt8 =          6
+    static let GROUP_LEADER:UInt8 =      7
+    static let EXIT2:UInt8 =             8
+    static let SEND_TT:UInt8 =           12
+    static let EXIT_TT:UInt8 =           13
+    static let REG_SEND_TT:UInt8 =       16
+    static let EXIT2_TT:UInt8 =          18
+    static let MONITOR_P:UInt8 =         19
+    static let DEMONITOR_P:UInt8 =       20
+    static let MONITOR_P_EXIT:UInt8 =    21
+    static let SEND_SENDER:UInt8 =       22
+    static let SEND_SENDER_TT:UInt8 =    23
+    static let PAYLOAD_EXIT:UInt8 =      24
+    static let PAYLOAD_EXIT_TT:UInt8 =   25
+    static let PAYLOAD_EXIT2:UInt8 =     26
+    static let PAYLOAD_EXIT2_TT:UInt8 =  27
+    static let PAYLOAD_MONITOR_P_EXIT:UInt8 = 28
+    static let SPAWN_REQUEST:UInt8 =     29
+    static let SPAWN_REQUEST_TT:UInt8 =  30
+    static let SPAWN_REPLY:UInt8 =       31
+    static let SPAWN_REPLY_TT:UInt8 =    32
+    static let ALIAS_SEND:UInt8 =        33
+    static let ALIAS_SEND_TT:UInt8 =     34
+    static let UNLINK_ID:UInt8 =         35
+    static let UNLINK_ID_ACK:UInt8 =     36
     
     //Defining these this way ensures they are UTF8
     static let SMALL_INTEGER_EXT:Character = "a"

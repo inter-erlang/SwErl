@@ -389,55 +389,80 @@ extension Data {
 
 
 // MARK: External to Pid and Node Name
-
+/// An extension to the `Data` type that decodes a `Pid` and a node name from its external representation.
+///
+/// This computed property decodes the `Pid` and the node name from the data and returns them along with the remaining data.
+/// The decoding process involves several steps:
+/// 1. Decode the node name from its external representation, which can be in different formats, a cached atom, a short UTF8 atom, or a UTF8 atom as indicated by the first byte.
+/// 2. Decode the ID, Serial, and Creation fields of the `Pid`.
+///
+/// If the data cannot be decoded correctly, the property returns `nil`.
+///
+/// Example usage:
+/// ```swift
+/// if let result = data.fromNewPidExt {
+///     let ((pid, nodeName), remainingData) = result
+///     print("Pid: \(pid), Node Name: \(nodeName), Remaining Data: \(remainingData)")
+/// }
+/// ```
+///
+/// - Complexity: O(n), where n is the length of the data being processed.
+///
+/// - Author: Lee Barney
+/// - Version: 0.9
 extension Data {
-    /// Decodes a `Pid` and node name from the `NEW_PID_EXT` representation used in Erlang's external term format.
-    /// This format is specifically designed to encode process identifiers (PIDs) with additional information
-    /// about the node on which the process is running. The `NEW_PID_EXT` format includes the external representation
-    /// of the node name followed by the PID's ID, Serial, and Creation values.
-    ///
-    /// The external representation format:
-    /// | Bytes |                           Value                                            |
-    /// |--------|---------------------------------------------------------|
-    /// |    1     |                88 (Tag for `NEW_PID_EXT`)                |
-    /// |    ?     | Node (External representation of the node name) |
-    /// |    4     |        ID (A 32-bit big endian unsigned integer)       |
-    /// |    4     |     Serial (A 32-bit big endian unsigned integer)     |
-    /// |    4     |   Creation (A 32-bit big endian unsigned integer)  |
-    ///
-    /// The node name is either in `SMALL_ATOM_UTF8_EXT` or `ATOM_UTF8_EXT` format. The Creation field helps to differentiate identifiers from different incarnations of the same node, with zero reserved for non-normal operations.
-    ///
-    /// - Returns: A tuple containing a `Pid` and the node name as a `String`, along with the remaining `Data`, or `nil` if the data is insufficient or decoding fails. This method enables the decoding of process identifiers and their associated node names from data streams conforming to Erlang's external term format.
-    ///
-    /// ### Complexity:
-    /// O(n), where n is the length of the external representation of the node name. The operation involves parsing the node name and extracting the PID's components.
-    ///
-    /// - Author: Lee S. Barney
-    /// - Version: 0.1
     var fromNewPidExt: ((Pid, String), Data)? {
         get {
-            // First, decode the node name from its external representation.
-            guard let (atom, reducedResult) = consumeExternal(rep: self),
-                  let node = atom as? SwErlAtom,
-                  let nodeName = node.string,
-                  reducedResult.count >= 12 // Ensure enough data for ID, Serial, and Creation
-            else {
+            // Decode the node name from its external representation.
+            guard let atomTypeIdicator = self.first else {
                 return nil
             }
-            var reduced = reducedResult
+            var remainingData = self.dropFirst()
+            var nodeAtom:SwErlAtom? = nil
+            if atomTypeIdicator == 82{//ATOM_CACHE_REF
+                guard let atomCacheRef = self.first else {
+                    return nil
+                }
+                remainingData.removeFirst()
+                let (found,name) = "atom_cache" ! (SafeDictCommand.get,atomCacheRef)
+                guard found == SwErlPassed.ok, let name = name as? String else{
+                    return nil
+                }
+                nodeAtom = SwErlAtom(name)
+            }
+            else if atomTypeIdicator == 118{//ATOM_UTF8_EXT
+                guard let (nodeAtom,remainingData) = remainingData.fromAtomUTF8Ext  else{
+                    return nil
+                }
+            }
+            else{//SMALL_ATOM_UTF8_EXT
+                guard let (nodeAtom,remainingData) = remainingData.fromSmallAtomUTF8Ext  else{
+                    return nil
+                }
+            }
             
-            // Decode the ID, Serial, and Creation fields.
-            let id = reduced.prefix(4).toMachineByteOrder.toUInt32
-            reduced = reduced.dropFirst(4)
+            guard remainingData.count >= 12 else{
+                return nil
+            }
+            guard let nodeAtom = nodeAtom else{
+                return nil
+            }
+            guard let nodeName = nodeAtom.string else{
+                return nil
+            }
             
-            let serial = reduced.prefix(4).toMachineByteOrder.toUInt32
-            reduced = reduced.dropFirst(4)
+            // Decode the ID and Serial fields.
+            let id = remainingData.prefix(4).toMachineByteOrder.toUInt32
+            remainingData = remainingData.dropFirst(4)
             
-            let creation = reduced.prefix(4).toMachineByteOrder.toUInt32
-            reduced = reduced.dropFirst(4)
+            let serial = remainingData.prefix(4).toMachineByteOrder.toUInt32
+            remainingData = remainingData.dropFirst(4)
+            
+            let creation = remainingData.prefix(4).toMachineByteOrder.toUInt32
+            remainingData = remainingData.dropFirst(4)
             
             // Return the decoded PID, node name, and the remaining data.
-            return ((Pid(id: id, serial: serial, creation: creation), nodeName), reduced)
+            return ((Pid(id: id, serial: serial, creation: creation), nodeName), remainingData)
         }
     }
     
@@ -470,30 +495,39 @@ extension Data {
     var fromPidExt: ((Pid, String), Data)? {
         get {
             // Decode the node name from its external representation.
-            guard let (atom, reducedResult) = consumeExternal(rep: self),
-                  let node = atom as? SwErlAtom,
-                  let nodeName = node.string,
-                  reducedResult.count >= 9 // Ensure enough data for ID, Serial, and Creation
-            else {
+            guard let atomCacheRefIndicator = self.first, atomCacheRefIndicator == 82 else {
                 return nil
             }
-            var reduced = reducedResult
+            var remainingData = self.dropFirst()
+            guard let atomCacheRef = self.first else {
+                return nil
+            }
+            remainingData.removeFirst()
+            let (found,cachedName) = "atom_cache" ! (SafeDictCommand.get,atomCacheRef)
+            guard remainingData.count >= 12,found == SwErlPassed.ok,let nodeName = cachedName as? String else{
+                return nil
+            }
+            guard let nodeName = cachedName as? String else{
+                return nil
+            }
+            
+            let node = SwErlAtom(nodeName)
             
             // Decode the ID and Serial fields.
-            let id = reduced.prefix(4).toMachineByteOrder.toUInt32
-            reduced = reduced.dropFirst(4)
+            let id = remainingData.prefix(4).toMachineByteOrder.toUInt32
+            remainingData = remainingData.dropFirst(4)
             
-            let serial = reduced.prefix(4).toMachineByteOrder.toUInt32
-            reduced = reduced.dropFirst(4)
+            let serial = remainingData.prefix(4).toMachineByteOrder.toUInt32
+            remainingData = remainingData.dropFirst(4)
             
             // Decode the Creation field.
-            guard let creation = reduced.first else {
+            guard let creation = remainingData.first else {
                 return nil
             }
-            reduced = reduced.dropFirst()
+            remainingData = remainingData.dropFirst()
             
             // Return the decoded PID, node name, and the remaining data.
-            return ((Pid(id: id, serial: serial, creation: UInt32(creation)), nodeName), reduced)
+            return ((Pid(id: id, serial: serial, creation: UInt32(creation)), nodeName), remainingData)
         }
     }
 }
@@ -1264,3 +1298,6 @@ func consumeExternal(rep:Data, customDecoder:((Data)->(Any?,Data))? = nil)->(Any
         return nil
     }
 }
+
+
+

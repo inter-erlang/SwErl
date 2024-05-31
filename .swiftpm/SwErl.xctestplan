@@ -56,6 +56,13 @@
         "identifier" : "SwErlNodeTests",
         "name" : "SwErlNodeTests"
       }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:",
+        "identifier" : "ComponentTests",
+        "name" : "ComponentTests"
+      }
     }
   ],
   "version" : 1

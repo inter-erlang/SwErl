@@ -38,6 +38,8 @@ import BigInt
 // MARK: Byte
 typealias Byte = UInt8
 
+typealias AtomCacheRefIndex = UInt8
+
 /// Concatenates two `Data` instances using the `++` operator.
 ///
 /// - Parameters:
@@ -300,6 +302,16 @@ extension Data {
         Array(self)
     }
 }
+
+
+extension Data {
+    var firstByte:Byte{
+        self.prefix(1).bytes[0]
+    }
+}
+
+
+
 
 
 

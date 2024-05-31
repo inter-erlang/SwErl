@@ -162,7 +162,7 @@ public func startEPMD(using conduitType:ExchangeProtocol = .tcp, on port:UInt16 
                     //clean up node alive record if the connection
                     //is the one used to originally store the
                     //NodeAlive data.
-                    guard let (success,name) = ("UUIDNameTracker" ! (SafeDictCommand.get,uuid)) as? (SwErlPassed,String) else{
+                    guard let (_,name) = ("UUIDNameTracker" ! (SafeDictCommand.get,uuid)) as? (SwErlPassed,String) else{
                         logger?.trace("\(uuid) connection not found in uuid-name tracker.")
                         return
                     }
@@ -360,7 +360,7 @@ func doNamesReq(port:UInt32, id:String, logger:Logger?) -> Data{
 /// - Author: Lee S. Barney
 /// - Version: 0.1
 
-fileprivate func doAliveX(data:Data, uuid:String, logger:Logger? = nil) -> Data?{
+func doAliveX(data:Data, uuid:String, logger:Logger? = nil) -> Data?{
     logger?.trace("\(uuid) alive request data \(Array(data))")
     let errorArray = [Byte(118),Byte(1)] + UInt32(1).toErlangInterchangeByteOrder.toByteArray
     let errorData = Data(errorArray)

@@ -72,7 +72,7 @@ public typealias SwErlStatelessHandler = (Pid, SwErlMessage) -> ()
 ///   - `.alreadyStarted`: Indicates an attempt to start a process that has already been started.
 ///
 /// - Author: Lee S. Barney
-/// - Version: 0.1 
+/// - Version: 0.1
 // MARK: SwErlError
 public enum SwErlError: Error {
     case processAlreadyLinked
@@ -177,6 +177,7 @@ public struct Pid: Hashable, Equatable {
 ///   - `node`:The atom indicating the node where the the process exists.
 ///   - `id`: The unique identifier of the originator of the process. This is zero when the process is local, non-zero when the process is a remote node.
 ///   - `creation`: The creation count associated with the process.
+///   - `cacheRef`: An optional indicator used when atoms are received or sent via an rpc call to or from another node.
 ///
 /// - Author:  Lee S. Barney
 /// - Version: 0.1
@@ -186,7 +187,6 @@ public struct SwErlRef: Hashable, Equatable {
     let node: SwErlAtom
     let id: UInt32
     let creation: UInt32
-    
 }
 
 /// Structure representing an Erlang Newer Identifier for a process.
@@ -222,6 +222,7 @@ public struct SwErlNewerRef: Hashable, Equatable {
 // MARK: SwErlAtom
 public struct SwErlAtom: Hashable, Equatable {
     private var value: String?
+    private var cacheRef: UInt8?
     
     /// Initializes an atom with the provided string value.
     ///
@@ -233,6 +234,16 @@ public struct SwErlAtom: Hashable, Equatable {
         else{
             self.value = value.lowercased()
         }
+    }
+    
+    init(_ value: String, _ ref: UInt8) {
+        if value.isEmpty {
+            self.value = nil
+        }
+        else{
+            self.value = value.lowercased()
+        }
+        self.cacheRef = ref
     }
 }
 /// Extension on `SwErlAtom` providing a computed property to get the string value.
@@ -260,6 +271,18 @@ public extension SwErlAtom {
 public extension SwErlAtom{
     var utf8: Data?{
         return self.value?.data(using: .utf8)
+    }
+}
+
+/// A computed property that returns the cache reference for the `SwErlAtom`.
+/// - Returns: An optional `UInt8` representing the cache reference of the `SwErlAtom`.
+/// - Complexity: O(1).
+///
+/// - Author: Lee Barney
+/// - Version: 0.1
+public extension SwErlAtom {
+    var cacheReference: UInt8? {
+        return self.cacheRef
     }
 }
 
@@ -1117,29 +1140,66 @@ func tupleToArray<T>(_ tuple: T) -> [Any] {
     return elements
 }
 
+/// Determines the arity (number of elements) of a tuple using reflection.
+/// - Parameter tuple: The tuple whose arity is to be determined.
+/// - Returns: The arity of the tuple, which is the number of elements it contains.
+///
+/// This function uses Swift's `Mirror` type to reflect on the tuple and count its elements.
+///
+/// Example:
+/// ```swift
+/// let myTuple = (1, "Hello", true)
+/// let arity = tupleArity(myTuple)
+/// print(arity) // Output: 3
+/// ```
+///
+/// - Complexity: O(1).
+///
+/// - Author: Lee Barney
+/// - Version: 0.9
+func tupleArity<T>(_ tuple: T) -> Int {
+    let mirror = Mirror(reflecting: tuple)
+    return mirror.children.count
+}
 
 
 
-/// This extension converts any Array with less than or equal to 30 elements of any type, [Any].
-/// - Returns: A tuple of the same size as the Array containing the same elements as the Array.
-/// - Author: Lee S. Barney
-/// - Version: 0.1
+
+/// An extension to the `Array` type that converts the array into a tuple of matching arity.
+///
+/// This computed property uses the `toTuples` list of closures to get the matching closure based on the array's count.
+/// It then sends the array to the closure to convert it into a tuple.
+///
+/// If the array's count does not match any of the predefined tuple arities in `toTuples`, the property will return `nil`.
+///
+/// Example:
+/// ```swift
+/// let array = [1, 2, 3]
+/// if let tuple = array.toTuple as? (Int, Int, Int) {
+///     print(tuple) // Output: (1, 2, 3)
+/// }
+/// ```
+///
+/// - Complexity: O(1).
+///
+/// - Author: Lee Barney
+/// - Version: 0.9
 // MARK: Array to Tuple
 extension Array {
-    
     var toTuple: Any? {
-        toTuples[self.count](self)
+        toTuples[self.count](self)//use the toTuples list of closures to get the matching closure, then send self to the closure.
     }
 }
 
-/// A computed property that converts arrays to tuples.
-/// If you want tuples of size greater than 30, add them in.
-/// Do NOT skip any sizes of Arrays and Tuples as this could
-/// cause undefined behavior.
+/// An array of closures that convert an array of elements into tuples of varying arities.
 ///
-/// This solution to Array to tuple converson is required until Swift.org adds tuple generation
-/// of size N. Something like `<Array>.toTuple` but being
-/// done natively, not like it is implemented here.
+/// Each closure checks the number of elements in the input array and returns a tuple with the corresponding arity.
+/// If the number of elements does not match the expected arity, the closure returns `nil`.
+///
+/// - Returns: A tuple with the corresponding arity if the input array's count matches the expected arity, otherwise `nil`.
+///
+/// - Author: Lee Barney
+/// - Version: 0.9
 let toTuples: [([Any]) -> Any?] = [
     { elements in
         guard elements.isEmpty else {
@@ -1206,5 +1266,125 @@ let toTuples: [([Any]) -> Any?] = [
             return nil
         }
         return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9])
+    },
+    { elements in
+        guard elements.count == 11 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9], elements[10])
+    },
+    { elements in
+        guard elements.count == 12 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9], elements[10], elements[11])
+    },
+    { elements in
+        guard elements.count == 13 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9], elements[10], elements[11], elements[12])
+    },
+    { elements in
+        guard elements.count == 14 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9], elements[10], elements[11], elements[12], elements[13])
+    },
+    { elements in
+        guard elements.count == 15 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9], elements[10], elements[11], elements[12], elements[13], elements[14])
+    },
+    { elements in
+        guard elements.count == 16 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9], elements[10], elements[11], elements[12], elements[13], elements[14], elements[15])
+    },
+    { elements in
+        guard elements.count == 17 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9], elements[10], elements[11], elements[12], elements[13], elements[14], elements[15], elements[16])
+    },
+    { elements in
+        guard elements.count == 18 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9], elements[10], elements[11], elements[12], elements[13], elements[14], elements[15], elements[16], elements[17])
+    },
+    { elements in
+        guard elements.count == 19 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9], elements[10], elements[11], elements[12], elements[13], elements[14], elements[15], elements[16], elements[17], elements[18])
+    },
+    { elements in
+        guard elements.count == 20 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9], elements[10], elements[11], elements[12], elements[13], elements[14], elements[15], elements[16], elements[17], elements[18], elements[19])
+    },
+    { elements in
+        guard elements.count == 21 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9], elements[10], elements[11], elements[12], elements[13], elements[14], elements[15], elements[16], elements[17], elements[18], elements[19], elements[20])
+    },
+    { elements in
+        guard elements.count == 22 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9], elements[10], elements[11], elements[12], elements[13], elements[14], elements[15], elements[16], elements[17], elements[18], elements[19], elements[20], elements[21])
+    },
+    { elements in
+        guard elements.count == 23 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9], elements[10], elements[11], elements[12], elements[13], elements[14], elements[15], elements[16], elements[17], elements[18], elements[19], elements[20], elements[21], elements[22])
+    },
+    { elements in
+        guard elements.count == 24 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9], elements[10], elements[11], elements[12], elements[13], elements[14], elements[15], elements[16], elements[17], elements[18], elements[19], elements[20], elements[21], elements[22], elements[23])
+    },
+    { elements in
+        guard elements.count == 25 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9], elements[10], elements[11], elements[12], elements[13], elements[14], elements[15], elements[16], elements[17], elements[18], elements[19], elements[20], elements[21], elements[22], elements[23], elements[24])
+    },
+    { elements in
+        guard elements.count == 26 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7],elements[8], elements[9], elements[10], elements[11], elements[12], elements[13], elements[14], elements[15], elements[16], elements[17], elements[18], elements[19], elements[20], elements[21], elements[22], elements[23], elements[24], elements[25])
+    },
+    { elements in
+        guard elements.count == 27 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9], elements[10], elements[11], elements[12], elements[13], elements[14], elements[15], elements[16], elements[17], elements[18], elements[19], elements[20], elements[21], elements[22], elements[23], elements[24], elements[25], elements[26])
+    },
+    { elements in
+        guard elements.count == 28 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9], elements[10], elements[11], elements[12], elements[13], elements[14], elements[15], elements[16], elements[17], elements[18], elements[19], elements[20], elements[21], elements[22], elements[23], elements[24], elements[25], elements[26], elements[27])
+    },
+    { elements in
+        guard elements.count == 29 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9], elements[10], elements[11], elements[12], elements[13], elements[14], elements[15], elements[16], elements[17], elements[18], elements[19], elements[20], elements[21], elements[22], elements[23], elements[24], elements[25], elements[26], elements[27], elements[28])
+    },
+    { elements in
+        guard elements.count == 30 else {
+            return nil
+        }
+        return (elements[0], elements[1], elements[2], elements[3], elements[4], elements[5], elements[6], elements[7], elements[8], elements[9], elements[10], elements[11], elements[12], elements[13], elements[14], elements[15], elements[16], elements[17], elements[18], elements[19], elements[20], elements[21], elements[22], elements[23], elements[24], elements[25], elements[26], elements[27], elements[28], elements[29])
     }
 ]
