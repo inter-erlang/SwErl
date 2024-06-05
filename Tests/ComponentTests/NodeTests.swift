@@ -9,6 +9,7 @@ import XCTest
 import Logging
 import SystemConfiguration
 @testable import SwErl
+import Network
 
 func getLocalHostName() -> String {
     // Buffer to hold the hostname
@@ -23,6 +24,10 @@ func getLocalHostName() -> String {
 final class NodeTests: XCTestCase {
     
     func testReceiver() throws{
+        
+        try buildSafe(dictionary: [String:NodePairAtomCache](), named: "atom_cache")
+        try buildSafe(dictionary: [String:NWConnection](), named: "connection_cache")
+        try buildSafe(dictionary: [String:Date](), named: "activity_cache")
         var logger = Logger(label: "epmdLogger")
         logger.logLevel = .trace
         startEPMD(logger:logger)//use defaults

@@ -125,6 +125,18 @@ final class SafeDataStructuresTests: XCTestCase {
         XCTAssertEqual(rawDict["testKey"], 1)
     }
     
+    func testDictionaryQueueing() throws{
+        let currentDate = Date()
+        try buildSafe(dictionary: [String:Date](), named: "TestDictionary")
+        "TestDictionary" ! (SafeDictCommand.add, "testKey",currentDate)
+        // Verify the state is as expected
+        guard let (success,value) = ("TestDictionary" ! (SafeDictCommand.get, "testKey")) as? (SwErlPassed,Date) else{
+            XCTFail()
+            return
+        }
+        XCTAssertEqual(currentDate, value)
+    }
+    
     func testPerformanceExample() throws {
         // This is an example of a performance test case.
         self.measure {

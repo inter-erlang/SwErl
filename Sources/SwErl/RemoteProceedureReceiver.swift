@@ -197,7 +197,7 @@ func startReceiver(using conduit:ExchangeProtocol = .tcp, name:String, cookie:St
 
 
 func doHandshake(uuid:String,localNodeName:String, cookie:String,data:Data,connection:NWConnection,epmdPort:UInt16 = 4369,localCreation:UInt32,logger:Logger?){
-
+    
     var localData = data
     logger?.trace("connection \(uuid) starting handshake")
     let capabilityFlags = localData.prefix(8).toMachineByteOrder.toUInt64
@@ -219,12 +219,12 @@ func doHandshake(uuid:String,localNodeName:String, cookie:String,data:Data,conne
     responseData = Data([115]) ++ responseData
     let responseLength = UInt16(responseData.count).toErlangInterchangeByteOrder.toByteArray
     responseData = Data(responseLength) ++ responseData
-
+    
     connection.send(content: responseData, completion: NWConnection.SendCompletion.contentProcessed { error in
         logger?.trace("connection \(uuid) status sent.")
         //now send a challenge
         let challenge = UInt32.random(in: UInt32.min...UInt32.max).bigEndian//is always big-endian
-
+        
         let challengeDigest = "\(cookie)\(challenge)".MD5//MD5 hash coming back should be this.
         guard let localNameData = localNodeName.data(using: .utf8) else{
             logger?.error("connection \(uuid) unable to convert node name \(remoteNodeName) to utf8")
@@ -237,7 +237,7 @@ func doHandshake(uuid:String,localNodeName:String, cookie:String,data:Data,conne
         //send the challenge
         connection.send(content: challengeData, completion: NWConnection.SendCompletion.contentProcessed { error in
             logger?.trace("connection \(uuid) challenge sent.")
-
+            
         })
         //when the connection is closed by the remote node, you get nil for  the incoming data.
         connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { challengeReplayData, _, _, error in
@@ -257,7 +257,7 @@ func doHandshake(uuid:String,localNodeName:String, cookie:String,data:Data,conne
             let challengeBytes = challengeReplyData.prefix(4)
             print("chbytes: \(Array(challengeBytes))")
             let challenge:UInt32 = challengeBytes.toUInt32//current
-
+            
             let blah = "\(cookie)\(challenge.toMachineByteOrder)".MD5
             let remoteNodeChallengeDigest = "\(cookie)\(challenge.byteSwapped)".MD5
             print("all: \(Array(remoteNodeChallengeDigest))\n\(Array(blah))\n")
@@ -274,14 +274,34 @@ func doHandshake(uuid:String,localNodeName:String, cookie:String,data:Data,conne
             logger?.trace("connection \(uuid) sending ack: \(Array(challengeAck))")
             connection.send(content: challengeAck, completion: NWConnection.SendCompletion.contentProcessed { error in
                 logger?.trace("connection \(uuid) challenge ack sent.")
-                connection.stateUpdateHandler = { newState in
-                    guard connection.state == NWConnection.State.ready else{//has not been cancled by the remote
-                        //remove from status storage dictionary
+//                connection.stateUpdateHandler = { newState in
+//                    guard connection.state == NWConnection.State.ready else{//has not been cancled by the remote
+//                        //remove from status storage dictionary
+//                        return
+//                    }
+//                    //add to status storage dictionary, key is name of remote
+//                }
+                startRepeatingNetworkTask(interval: 15,connection:connection){//send a tick every fifteen seconds
+                    connection.send(content: Data([0,0,0]), completion: .contentProcessed { error in
+                        if let error = error {
+                            logger?.error("\(uuid) failed to send tick: \(error)")
+                        } else {
+                            logger?.trace("\(uuid) sent tick")
+                        }
+                    })
+                    return
+                }
+                startRepeatingNetworkTask(interval: 60, connection: connection){//check for in or out activity every 60 seconds
+                    logger?.trace("\(uuid) checking in/out activity")
+                    guard case let (SwErlPassed.ok,last) = "activity_cache" ! (SafeDictCommand.get, uuid), let last = last as? Date else{
+                        logger?.error("\(uuid) missing its activity cache")
                         return
                     }
-                    //add to status storage dictionary, key is name of remote
+                    if Date().timeIntervalSince(last) >= 60{
+                        logger?.trace("\(uuid) cancelling due to inactivity")
+                        connection.cancel()
+                    }
                 }
-                
                 doRPCResponse(uuid:uuid, connection:connection, status:remoteStatus, logger: logger)
             })
         }
@@ -291,31 +311,28 @@ func doHandshake(uuid:String,localNodeName:String, cookie:String,data:Data,conne
 fileprivate func doRPCResponse(uuid:String, connection:NWConnection, status:Status,logger:Logger? = nil) {
     connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, _, _, error in
         guard let data = data, data.count >= 3 else{
-            logger?.trace("connection \(uuid) got invalid waitForData data")
-            doRPCResponse(uuid: uuid, connection: connection, status: status, logger:logger)
+            logger?.trace("connection \(uuid) got invalid waitForData data: \(String(describing: data))")
+            connection.cancel()
             return
         }
         logger?.trace("connection \(uuid) request data \(Array(data))")
         
-        //the message may be a 'is_alive' message consisting of 4 bytes that are all zeros. If so, short circut any further computation and send an 'is_alive' response.
+        //the message may be a 'is_alive' message consisting of 4 bytes that are all zeros. If so, short circut any further computation.
         guard data.count != 4,data.prefix(4) != Data([0,0,0,0]) else{
-            connection.send(content: data, completion: .contentProcessed { error in
-                            if let error = error {
-                                logger?.error("\(uuid) failed to send is_alive response: \(error)")
-                            } else {
-                                logger?.trace("\(uuid) sent is_alive response")
-                            }
-                        })
             return
         }
         
+        let currentCacheDate = Date()
+        "activity_cache" ! (SafeDictCommand.add, uuid, currentCacheDate)
+        logger?.trace("\(uuid) updated activity cache with \(currentCacheDate)")
+        
         readDistributionMessage(connection: connection, message: data, uuid: uuid, logger: logger)
         
-//        guard var (atomCacheRefs,flags,remainingData) = decodeDistributionHeader(data: data, uuid: uuid, connection: connection, status: status, logger: logger) else{
-//            logger?.trace("connection \(uuid) unable to read distribution header.")
-//            doRPCResponse(uuid: uuid, connection: connection, status: status, logger:logger)//call again on failure
-//            return
-//        }
+        //        guard var (atomCacheRefs,flags,remainingData) = decodeDistributionHeader(data: data, uuid: uuid, connection: connection, status: status, logger: logger) else{
+        //            logger?.trace("connection \(uuid) unable to read distribution header.")
+        //            doRPCResponse(uuid: uuid, connection: connection, status: status, logger:logger)//call again on failure
+        //            return
+        //        }
         
         
         
@@ -334,44 +351,49 @@ fileprivate func readDistributionMessage(connection:NWConnection, message:Data, 
         return
     }
     let messageLength = message.prefix(4).toMachineByteOrder.toUInt32
-    print("dbug length: \(message.count) \(messageLength)")
+    logger?.trace("\(uuid) reading \(messageLength) bytes as message")
     var remainingMessage = message.dropFirst(4)
     guard let termIndicator = remainingMessage.first, termIndicator == 131 else{
         logger?.error("connection \(uuid) bad message")
         return
     }
+    logger?.trace("\(uuid) got term indicator \(termIndicator)")
     remainingMessage = remainingMessage.dropFirst()
     guard let normalSplitIndicator = DistHeaderType(rawValue: remainingMessage.first ?? 100) else{
         logger?.error("connection \(uuid) bad message type indicator")
         return
     }
+    logger?.trace("\(uuid) normal/split message indicator is \(normalSplitIndicator)")
     remainingMessage = remainingMessage.dropFirst()
     switch normalSplitIndicator {
     case DistHeaderType.normal:
-        print("normal")
         readNormalMessage(connection:connection,message:remainingMessage, ofLength: Int(messageLength), uuid:uuid, logger:logger)
     case DistHeaderType.fragmented:
-        print("fragmented")
+        logger?.trace("\(uuid) not yet implemented")
     case DistHeaderType.compressed:
-        print("compressed")
+        logger?.trace("\(uuid) not yet implemented")
     }
-
+    
 }
 
 fileprivate func readNormalMessage(connection:NWConnection, message:Data, ofLength:Int, uuid:String, logger:Logger?){
     // Retrieve and decompose the response into success and pairAtomCache
+    logger?.trace("\(uuid) reading \(Array(message)) as normal message")
     var (success,pairAtomCache) = "atom_cache" ! (SafeDictCommand.get,uuid) as? (SwErlPassed,NodePairAtomCache) ?? (SwErlPassed.fail,NodePairAtomCache())
     if success == SwErlPassed.fail {
+        logger?.trace("\(uuid) creating atom cache for connection")
         // Initialize a new atom cache if the retrieval failed
         pairAtomCache = NodePairAtomCache()
-        
+        logger?.trace("\(uuid) adding empty atom cache for connection")
         // Add the new atom cache to "atom_cache"
         "atom_cache" ! (SafeDictCommand.add, uuid, pairAtomCache)
     }
     var messageCount = ofLength
     guard var numAtomCacheRefs = message.first else{
+        logger?.error("\(uuid) no atom cache refs in control message")
         return
     }
+    logger?.trace("\(uuid) number of atom cache refs \(numAtomCacheRefs)")
     var remainingMessage = message.dropFirst()
     messageCount = messageCount - 1
     guard remainingMessage.count > 0 else{
@@ -380,36 +402,42 @@ fileprivate func readNormalMessage(connection:NWConnection, message:Data, ofLeng
     if numAtomCacheRefs > 0{
         let flagByteCount = Int(numAtomCacheRefs/2 + 1)
         let flagBytes = remainingMessage.prefix(flagByteCount)
-        print("flagBytes: \(flagBytes.bytes)")
+        //print("flagBytes: \(flagBytes.bytes)")
         remainingMessage.removeFirst(flagByteCount)
         messageCount = messageCount - flagByteCount
         var flagList = Array(flagBytes.map{getNibbles(from:$0)}.joined())
+        logger?.trace("\(uuid) atom flags: \(flagList)")
         var usesLongAtoms = false
         if numAtomCacheRefs % 2 == 0 && flagList.last != 0{
+            logger?.trace("\(uuid) uses long atoms")
             usesLongAtoms = true
             flagList.removeLast(2)//get rid of the long atoms flags so they aren't misinterpreted as cache entry/segment index nibbles.
         }
         else if flagList[flagList.count - 2] != 0{//odd count
+            logger?.trace("\(uuid) uses long atoms")
             usesLongAtoms = true
             flagList.remove(at: flagList.count - 2)//get rid of the long atoms flag so it isn't misinterpreted as a cache entry/segment index nibble.
         }
-        print("flags: \(flagList)")
         //decode the flags
-        let (existingCacheRefCount,segmentIndexs) = flagList.reduce((UInt8(0),[UInt8]())){accum, flag in
+        // TODO: this flag decoding is being done wrong. It yeilds the wrong existing cache ref count
+        let (existingCacheRefCount,_) = flagList.reduce((UInt8(0),[UInt8]())){accum, flag in
             var (existingAccum,indexAccum) = accum
             let isNewCacheEntry = (flag & 0b1000) == 0b1000
             let segmentIndex = flag & 0b111
-            if isNewCacheEntry {
+            if isNewCacheEntry == false{
+                logger?.trace("\(uuid) \(flag) indicates cached entry")
                 existingAccum = existingAccum + 1
             }
             indexAccum.append(segmentIndex)
             return (existingAccum,indexAccum)
         }
+        logger?.trace("\(uuid) existing cached refs count \(existingCacheRefCount)")
         //ignore the existing atom cache refs we can look them up later anyway.
         remainingMessage.removeFirst(Int(existingCacheRefCount))
+        logger?.trace("\(uuid) ignoring existing cached atoms \(Array(remainingMessage.prefix(Int(existingCacheRefCount))))")
         numAtomCacheRefs = numAtomCacheRefs - existingCacheRefCount
         remainingMessage = updateAtomCache(message: remainingMessage, cacheRefCount: numAtomCacheRefs, pairAtomCache: pairAtomCache as! NodePairAtomCache, longAtoms: usesLongAtoms, uuid: uuid, logger: logger)
-
+        logger?.trace("\(uuid) decoding \(Array(remainingMessage)) as control message")
         guard let ((controlData,controlType),remainingMessage) = decodeControlMessage(data: remainingMessage, uuid: uuid, logger: logger) as? ((Any,UInt8),Data) else{
             logger?.error("connection \(uuid) bad control message in rpc request")
             return
@@ -451,10 +479,20 @@ fileprivate func readNormalMessage(connection:NWConnection, message:Data, ofLeng
                     logger?.trace("connection \(uuid) connection failed: \(error)")
                     "atom_cache" ! (SafeDictCommand.remove,uuid)
                     "connection_cache" ! (SafeDictCommand.remove, name)
+                    connection.cancel()
                 case .cancelled:
                     logger?.trace("connection \(uuid) connection cancelled.")
                     "atom_cache" ! (SafeDictCommand.remove,uuid)
                     "connection_cache" ! (SafeDictCommand.remove, name)
+                    
+                    //remove the cached values for the 60 second activity limit timer for this connection.
+                    guard case let (SwErlPassed.ok, trackers) = "tick_activity_timer_cache" ! (SafeDictCommand.get, uuid), let (tickTracker,activityTracker) = trackers as? (DispatchSourceTimer,DispatchSourceTimer) else{
+                        logger?.error("\(uuid) unable to find activity and tick tracker. Activity tracker and timer not removed from caches.")
+                        return
+                    }
+                    tickTracker.cancel()
+                    activityTracker.cancel()
+                    "tick_activity_timer_cache" ! (SafeDictCommand.remove, uuid)
                 default:
                     logger?.trace("connection \(uuid) connection in unrecognized state \(aState)")
                     break
@@ -506,6 +544,7 @@ fileprivate func readNormalMessage(connection:NWConnection, message:Data, ofLeng
 
 func updateAtomCache(message:Data, cacheRefCount:UInt8, pairAtomCache:NodePairAtomCache, longAtoms:Bool, uuid:String, logger:Logger?)->Data{
     var localMessage = message
+    logger?.trace("\(uuid) caching \(cacheRefCount) atoms")
     for _ in 0..<cacheRefCount{
         let cacheRef = localMessage.firstByte
         localMessage.removeFirst()
@@ -516,6 +555,7 @@ func updateAtomCache(message:Data, cacheRefCount:UInt8, pairAtomCache:NodePairAt
             continue
         }
         localMessage.removeFirst(Int(atomCharacterCount))
+        logger?.trace("\(uuid) caching atom \(atomString)")
         "atom_cache" ! (SafeDictCommand.add,cacheRef,SwErlAtom(atomString,cacheRef))
     }
     return localMessage
@@ -569,12 +609,14 @@ fileprivate func decodeDistributionHeader(data:Data, uuid:String, connection:NWC
 
 func decodeControlMessage(data: Data, uuid: String, logger: Logger?)->((Any,UInt8)?,Data){
     guard data.firstByte == 104 else {//the control message must always be an encoded tuple according to the documentation.
+        logger?.error("\(uuid) bad control message expected 104 got \(data.firstByte)")
         return (nil,data)
     }
     var remainingData = data.dropFirst()
     let controlArity = remainingData.firstByte
     remainingData.removeFirst()//the arity of the control tuple is not needed in this code
     guard remainingData.firstByte == 97 else{//the first element of the tuple must be of type small_int
+        logger?.error("\(uuid) bad control message expected 97 got \(remainingData.firstByte)")
         return (nil,data)
     }
     remainingData.removeFirst()
@@ -597,7 +639,8 @@ func decodeControlMessage(data: Data, uuid: String, logger: Logger?)->((Any,UInt
         case ERL.REG_SEND:
             //the next three items are FromPid, Unused, and ToName
             guard let result = remainingData.fromNewPidExt else{
-                return (nil,remainingData)//place holder code
+                logger?.error("\(uuid) unable to generate pid from \(remainingData)")
+                return (nil,remainingData)
             }
             return ((result,ERL.REG_SEND),remainingData)
         case ERL.GROUP_LEADER:
@@ -682,7 +725,7 @@ func decodeControlMessage(data: Data, uuid: String, logger: Logger?)->((Any,UInt
 
 //func doHandshake(uuid:String,localNodeName:String, cookie:String,data:Data,connection:NWConnection,epmdPort:UInt16 = 4369,creation:UInt32,logger:Logger?) {
 //    let uuid = UUID().uuidString
-//    
+//
 //    //TODO: check to see if there is already a connection to the node. If there is, stop.
 //    //connect to EPMD and find out the port the node is listening on.
 //    let parts = node.split(separator: "@")
@@ -690,7 +733,7 @@ func decodeControlMessage(data: Data, uuid: String, logger: Logger?)->((Any,UInt
 //    if parts.count == 2{
 //        hostName = String(parts[1])
 //    }
-//    
+//
 //    let shortName:String = String(parts[0])
 //    guard let shortNameData = shortName.data(using: .utf8) else{
 //        return
@@ -698,18 +741,18 @@ func decodeControlMessage(data: Data, uuid: String, logger: Logger?)->((Any,UInt
 //    logger?.trace("connection \(uuid) initializing handshake with node \(shortName)@\(hostName)")
 //    var PORT_PLEASE2_Data = Data([122]) ++ shortNameData
 //    PORT_PLEASE2_Data = Data(UInt16(PORT_PLEASE2_Data.count).toErlangInterchangeByteOrder.toByteArray) ++ PORT_PLEASE2_Data
-//    
+//
 //    let host = NWEndpoint.Host(hostName)
 //    let port = NWEndpoint.Port(rawValue: epmdPort)!
-//    
+//
 //    // Create the connection
 //    logger?.trace("connection \(uuid) connecting to \(host):\(port)")
 //    let epmdConnection = NWConnection(host: host, port: port, using: .tcp)
-//    
-//    
+//
+//
 //    // Start the connection
 //    epmdConnection.start(queue: .global())
-//    
+//
 //    logger?.trace("connection \(uuid) sending port please data \(Array(PORT_PLEASE2_Data))")
 //    //send the data array
 //    epmdConnection.send(content: PORT_PLEASE2_Data, completion: .contentProcessed({ error in
@@ -738,10 +781,10 @@ func decodeControlMessage(data: Data, uuid: String, logger: Logger?)->((Any,UInt
 //                    //connect to the Node.
 //                    logger?.trace("connection \(uuid) connecting to \(host) on port \(portNum)")
 //                    let nodePort = NWEndpoint.Port(rawValue: portNum)!
-//                    
+//
 //                    // Create the connection
 //                    let nodeConnection = NWConnection(host: host, port: nodePort, using: .tcp)
-//                    
+//
 //                    //use a made up creation number. see if it works.
 //                    var sendNameData = Data(UInt32(123456).toErlangInterchangeByteOrder.toByteArray)
 //                    guard let nameData =  localNodeName.data(using: .utf8) else{
@@ -750,7 +793,7 @@ func decodeControlMessage(data: Data, uuid: String, logger: Logger?)->((Any,UInt
 //                    }
 //                    sendNameData = Data([78]) ++ Data(DIST_MANDATORY.toErlangInterchangeByteOrder.toByteArray) ++ sendNameData ++ Data(UInt16(nameData.count).toErlangInterchangeByteOrder.toByteArray) ++ nameData
 //                    sendNameData = Data(UInt16(sendNameData.count).toErlangInterchangeByteOrder.toByteArray) ++ sendNameData
-//                    
+//
 //                    let nameDataToSend = sendNameData
 //                    nodeConnection.start(queue: .global())
 //                    nodeConnection.send(content: nameDataToSend, completion: .contentProcessed({ error in
@@ -790,7 +833,7 @@ func decodeControlMessage(data: Data, uuid: String, logger: Logger?)->((Any,UInt
 //                                        let flags = challengeData.prefix(8).toMachineByteOrder.toUInt64
 //                                        challengeData = challengeData.dropFirst(8)
 //                                        let remoteChallenge = challengeData.prefix(4).toMachineByteOrder.toUInt32
-//                                        
+//
 //                                        challengeData = challengeData.dropFirst(4)
 //                                        let creation = challengeData.prefix(4).toMachineByteOrder.toUInt32
 //                                        challengeData = challengeData.dropFirst(4)
@@ -802,10 +845,10 @@ func decodeControlMessage(data: Data, uuid: String, logger: Logger?)->((Any,UInt
 //                                        let blah = "\(remoteChallenge)\(cookie)".MD5
 //                                        let blif = "\(remoteChallenge.byteSwapped)\(cookie)".MD5
 //                                        let blew = "\(cookie)\(remoteChallenge.byteSwapped)".MD5
-//                                        
+//
 //                                        print("all: \(remoteChallengeDigest)\n\(blah)\n\(blif)\n\(blew)")
-//                                        
-//                                        
+//
+//
 //                                        logger?.trace("connection \(uuid) digest for remote challenge created using: \(cookie)\(remoteChallenge) digest: \(remoteChallengeDigest)")
 //                                        let challengeData = Data(UInt32.random(in: UInt32.min...UInt32.max).toErlangInterchangeByteOrder.toByteArray)
 //                                        var challengeReplyData = Data([114]) ++ challengeData ++ remoteChallengeDigest
@@ -817,7 +860,7 @@ func decodeControlMessage(data: Data, uuid: String, logger: Logger?)->((Any,UInt
 //                                                nodeConnection.cancel()
 //                                                return
 //                                            }
-//                                            
+//
 //                                            logger?.trace("connection \(uuid) \(node) sent challenge \(remoteChallenge) and creation \(creation) waiting for challenge ack")
 //                                            nodeConnection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { (data, _, isComplete, error) in
 //                                                let blah = 1+1
@@ -827,10 +870,10 @@ func decodeControlMessage(data: Data, uuid: String, logger: Logger?)->((Any,UInt
 //                                                }
 //                                                logger?.trace("connection \(uuid) received challenge ack \(Array(data))")
 //                                            }
-//                                            
-//                                            
+//
+//
 //                                        }))
-//                                        
+//
 //                                    }
 //                                }//end of receive challenge
 //                            }
@@ -838,7 +881,7 @@ func decodeControlMessage(data: Data, uuid: String, logger: Logger?)->((Any,UInt
 //                    })
 //                    )//end of nodeConnection send
 //                }
-//                
+//
 //            }//end of connection receive
 //        }
 //    })

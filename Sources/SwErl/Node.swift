@@ -29,6 +29,27 @@ import Network
 
 typealias NodePairAtomCache = [UInt8: SwErlAtom]
 
+
+func startRepeatingNetworkTask(interval: TimeInterval, connection:NWConnection, task: @escaping () -> Void) {
+    func scheduleNext() {
+        DispatchQueue.global().asyncAfter(deadline: .now() + interval) {
+            
+            //terminate if there is no valid connection
+            switch connection.state{
+            case .cancelled,.failed:
+                return
+            default:
+                task()
+                scheduleNext()  // Recursively schedule the next execution
+            }
+        }
+    }
+    //schedule first task completion
+    scheduleNext()
+}
+
+
+
 enum Node{
     static func spawn(using conduit:ExchangeProtocol = .tcp, name:String, cookie:String, epmdPort:UInt16 = 4369, EPMDLogger:Logger? = nil, interNodeLogger:Logger? = nil){
         //start EPMD if none exists
@@ -37,10 +58,16 @@ enum Node{
         do{
             try buildSafe(dictionary: [String:NodePairAtomCache](), named: "atom_cache")
             try buildSafe(dictionary: [String:NWConnection](), named: "connection_cache")
+            try buildSafe(dictionary: [String:Date](), named: "activity_cache")
         }
         catch{}
         //start Remote Proceedure Receiver
         startReceiver(using:conduit, name:name, cookie:cookie, epmdPort:epmdPort, logger:interNodeLogger)
         
+    }
+    static func sendData(_ data:Data, using connection:NWConnection, id:String, completion:NWConnection.SendCompletion){
+        "activity_time_cache" ! (SafeDictCommand.add,id,Date().timeIntervalSince1970)
+        connection.send(content: data, completion: completion)
+        return
     }
 }
