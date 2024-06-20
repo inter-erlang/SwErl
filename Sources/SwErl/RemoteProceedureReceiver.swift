@@ -195,7 +195,37 @@ func startReceiver(using conduit:ExchangeProtocol = .tcp, name:String, cookie:St
 
 
 
-
+/// Performs a handshake at the request of a remote node, validating a connection request.
+///
+/// This function reacts to a handshake process request, starting with capability flag exchange and continuing with challenge-response
+/// verification. If successful, it starts repeating network tasks for sending ticks, checking activity, and waiting for additional incoming requests.
+///
+/// Example usage:
+/// ```swift
+/// let uuid = "unique-uuid"
+/// let localNodeName = "localNode"
+/// let cookie = "secretCookie"
+/// let data = Data()
+/// let connection: NWConnection = // Initialize your NWConnection
+/// let logger: Logger? = // Initialize your Logger
+/// let localCreation: UInt32 = 12345
+/// doHandshake(uuid: uuid, localNodeName: localNodeName, cookie: cookie, data: data, connection: connection, localCreation: localCreation, logger: logger)
+/// ```
+///
+/// - Parameters:
+///   - uuid: A unique identifier for the connection.
+///   - localNodeName: The name of the local SwErl node.
+///   - cookie: A secret cookie shared by all nodes in the system.
+///   - data: Data received from the remote node to start the handshake.
+///   - connection: The network connection to use.
+///   - epmdPort: The port for the EPMD. Defaults to `4369`.
+///   - localCreation: The creation identifier for the local node.
+///   - logger: An optional logger for tracing and error logging.
+///
+/// - Complexity: O(n), where n is the length of the data being processed.
+///
+/// - Author: Lee Barney
+/// - Version: 0.9
 func doHandshake(uuid:String,localNodeName:String, cookie:String,data:Data,connection:NWConnection,epmdPort:UInt16 = 4369,localCreation:UInt32,logger:Logger?){
     
     var localData = data
@@ -274,13 +304,6 @@ func doHandshake(uuid:String,localNodeName:String, cookie:String,data:Data,conne
             logger?.trace("connection \(uuid) sending ack: \(Array(challengeAck))")
             connection.send(content: challengeAck, completion: NWConnection.SendCompletion.contentProcessed { error in
                 logger?.trace("connection \(uuid) challenge ack sent.")
-//                connection.stateUpdateHandler = { newState in
-//                    guard connection.state == NWConnection.State.ready else{//has not been cancled by the remote
-//                        //remove from status storage dictionary
-//                        return
-//                    }
-//                    //add to status storage dictionary, key is name of remote
-//                }
                 startRepeatingNetworkTask(interval: 15,connection:connection){//send a tick every fifteen seconds
                     connection.send(content: Data([0,0,0]), completion: .contentProcessed { error in
                         if let error = error {
@@ -297,10 +320,10 @@ func doHandshake(uuid:String,localNodeName:String, cookie:String,data:Data,conne
                         logger?.error("\(uuid) missing its activity cache")
                         return
                     }
-                    if Date().timeIntervalSince(last) >= 60{
-                        logger?.trace("\(uuid) cancelling due to inactivity")
-                        connection.cancel()
-                    }
+//                    if Date().timeIntervalSince(last) >= 60{
+//                        logger?.trace("\(uuid) cancelling due to inactivity")
+//                        connection.cancel()
+//                    }
                 }
                 doRPCResponse(uuid:uuid, connection:connection, status:remoteStatus, logger: logger)
             })
@@ -325,7 +348,7 @@ fileprivate func doRPCResponse(uuid:String, connection:NWConnection, status:Stat
         let currentCacheDate = Date()
         "activity_cache" ! (SafeDictCommand.add, uuid, currentCacheDate)
         logger?.trace("\(uuid) updated activity cache with \(currentCacheDate)")
-        
+        logger?.trace("\(uuid) received message data \(Array(data))")
         readDistributionMessage(connection: connection, message: data, uuid: uuid, logger: logger)
         
         //        guard var (atomCacheRefs,flags,remainingData) = decodeDistributionHeader(data: data, uuid: uuid, connection: connection, status: status, logger: logger) else{
@@ -345,7 +368,26 @@ fileprivate func doRPCResponse(uuid:String, connection:NWConnection, status:Stat
         doRPCResponse(uuid:uuid, connection: connection, status: status, logger: logger)//recursively call this function. stack overflow problem?
     }
 }
-
+/// Reads and processes a distribution message received over a network connection.
+///
+/// This function reads a distribution message from the provided `Data` object, checking for valid message length and type indicators.
+/// It handles normal messages directly and logs errors or traces for unsupported message types.
+///
+/// Example usage:
+/// ```swift
+/// readDistributionMessage(connection: connection, message: messageData, uuid: "unique-uuid", logger: logger)
+/// ```
+///
+/// - Parameters:
+///   - connection: The network connection from which the message was received.
+///   - message: The message data to be read and processed.
+///   - uuid: A unique identifier for the connection, used for logging.
+///   - logger: An optional logger for tracing and error logging.
+///
+/// - Complexity: O(n), where n is the length of the message being processed.
+///
+/// - Author: Lee Barney
+/// - Version: 0.9
 fileprivate func readDistributionMessage(connection:NWConnection, message:Data, uuid:String, logger:Logger?){
     guard message.count > 4 else{
         return
@@ -376,6 +418,28 @@ fileprivate func readDistributionMessage(connection:NWConnection, message:Data, 
     
 }
 
+/// Reads and processes a normal (not split) distribution message received over a network connection.
+///
+/// This function reads a normal distribution message, updates the atom cache if necessary,
+/// and acts on the control message data contained within the message. It handles errors and logging
+/// appropriately throughout the process.
+///
+/// Example usage:
+/// ```swift
+/// readNormalMessage(connection: connection, message: messageData, ofLength: messageData.count, uuid: "unique-uuid", logger: logger)
+/// ```
+///
+/// - Parameters:
+///   - connection: The network connection from which the message was received.
+///   - message: The message data to be read and processed.
+///   - ofLength: The length of the message data.
+///   - uuid: A unique identifier for the connection, used for logging.
+///   - logger: An optional logger for tracing and error logging.
+///
+/// - Complexity: O(n), where n is the length of the message being processed.
+///
+/// - Author: Lee Barney
+/// - Version: 0.9
 fileprivate func readNormalMessage(connection:NWConnection, message:Data, ofLength:Int, uuid:String, logger:Logger?){
     // Retrieve and decompose the response into success and pairAtomCache
     logger?.trace("\(uuid) reading \(Array(message)) as normal message")
@@ -418,9 +482,12 @@ fileprivate func readNormalMessage(connection:NWConnection, message:Data, ofLeng
             usesLongAtoms = true
             flagList.remove(at: flagList.count - 2)//get rid of the long atoms flag so it isn't misinterpreted as a cache entry/segment index nibble.
         }
+        let suffix = flagList.suffix(2).filter{ $0>0}//one or two of the last nibbles will be a zero padding.
+        flagList.removeLast(2)// Remove the padding.
+        flagList += suffix//add back any nibbles that weren't zero padding
         //decode the flags
         // TODO: this flag decoding is being done wrong. It yeilds the wrong existing cache ref count
-        let (existingCacheRefCount,_) = flagList.reduce((UInt8(0),[UInt8]())){accum, flag in
+        let (existingCacheRefCount,cacheSegments) = flagList.reduce((UInt8(0),[UInt8]())){accum, flag in
             var (existingAccum,indexAccum) = accum
             let isNewCacheEntry = (flag & 0b1000) == 0b1000
             let segmentIndex = flag & 0b111
@@ -432,11 +499,9 @@ fileprivate func readNormalMessage(connection:NWConnection, message:Data, ofLeng
             return (existingAccum,indexAccum)
         }
         logger?.trace("\(uuid) existing cached refs count \(existingCacheRefCount)")
-        //ignore the existing atom cache refs we can look them up later anyway.
         remainingMessage.removeFirst(Int(existingCacheRefCount))
-        logger?.trace("\(uuid) ignoring existing cached atoms \(Array(remainingMessage.prefix(Int(existingCacheRefCount))))")
-        numAtomCacheRefs = numAtomCacheRefs - existingCacheRefCount
-        remainingMessage = updateAtomCache(message: remainingMessage, cacheRefCount: numAtomCacheRefs, pairAtomCache: pairAtomCache as! NodePairAtomCache, longAtoms: usesLongAtoms, uuid: uuid, logger: logger)
+        
+        remainingMessage = updateAtomCache(message: remainingMessage, cacheSegments: cacheSegments, pairAtomCache: pairAtomCache as! NodePairAtomCache, longAtoms: usesLongAtoms, uuid: uuid, logger: logger)
         logger?.trace("\(uuid) decoding \(Array(remainingMessage)) as control message")
         guard let ((controlData,controlType),remainingMessage) = decodeControlMessage(data: remainingMessage, uuid: uuid, logger: logger) as? ((Any,UInt8),Data) else{
             logger?.error("connection \(uuid) bad control message in rpc request")
@@ -462,8 +527,12 @@ fileprivate func readNormalMessage(connection:NWConnection, message:Data, ofLeng
                 logger?.info("connection \(uuid) has bad message payload data")
                 return
             }
-            let (found,name) = "atom_cache" ! (SafeDictCommand.get,atomCacheRef)
-            guard found == SwErlPassed.ok, let name = name as? String else{
+            var (found,name):(SwErlPassed,Any?) = (.ok,"nil")
+            if atomCacheRef != 0{
+                (found,name) = "atom_cache" ! (SafeDictCommand.get,atomCacheRef)
+            }
+            
+            guard found == .ok, let name = name as? String else{
                 logger?.info("connection \(uuid) has bad atom in message payload")
                 return
             }
@@ -542,10 +611,34 @@ fileprivate func readNormalMessage(connection:NWConnection, message:Data, ofLeng
 //    }
 //}
 
-func updateAtomCache(message:Data, cacheRefCount:UInt8, pairAtomCache:NodePairAtomCache, longAtoms:Bool, uuid:String, logger:Logger?)->Data{
+
+/// Updates the atom cache with new atom strings extracted from the provided message data.
+///
+/// This function extracts atom strings from the message data, converts them to `SwErlAtom` objects, and stores them
+/// in the atom cache. It logs each step of the process for tracing and error handling.
+///
+/// Example usage:
+/// ```swift
+/// let updatedMessage = updateAtomCache(message: messageData, cacheSegments: cacheSegments, pairAtomCache: atomCache, longAtoms: false, uuid: "unique-uuid", logger: logger)
+/// ```
+///
+/// - Parameters:
+///   - message: The message data containing the atoms to be cached.
+///   - cacheSegments: An array of `UInt8` values representing the segments of the cache.
+///   - pairAtomCache: The `NodePairAtomCache` to store the atoms.
+///   - longAtoms: A boolean indicating whether the atoms are long atoms.
+///   - uuid: A unique identifier for the connection, used for debugging and logging.
+///   - logger: An optional logger for tracing and error logging.
+/// - Returns: The remaining message data after the atoms have been extracted and cached.
+///
+/// - Complexity: O(n), where n is the length of the message being processed.
+///
+/// - Author: Lee Barney
+/// - Version: 0.9
+func updateAtomCache(message:Data, cacheSegments:[UInt8], pairAtomCache:NodePairAtomCache, longAtoms:Bool, uuid:String, logger:Logger?)->Data{
     var localMessage = message
-    logger?.trace("\(uuid) caching \(cacheRefCount) atoms")
-    for _ in 0..<cacheRefCount{
+    logger?.trace("\(uuid) caching \(cacheSegments.count) atoms")
+    for segmentIndex in cacheSegments {
         let cacheRef = localMessage.firstByte
         localMessage.removeFirst()
         let atomCharacterCount = localMessage.firstByte
@@ -555,18 +648,61 @@ func updateAtomCache(message:Data, cacheRefCount:UInt8, pairAtomCache:NodePairAt
             continue
         }
         localMessage.removeFirst(Int(atomCharacterCount))
-        logger?.trace("\(uuid) caching atom \(atomString)")
-        "atom_cache" ! (SafeDictCommand.add,cacheRef,SwErlAtom(atomString,cacheRef))
+        logger?.trace("\(uuid) caching atom pair \(segmentIndex+cacheRef) => \(atomString)")
+        "atom_cache" ! (SafeDictCommand.add,segmentIndex+cacheRef,SwErlAtom(atomString,cacheRef))
     }
     return localMessage
 }
 
+/// Splits a byte into its upper and lower nibbles.
+///
+/// This function takes a single byte and returns an array containing the upper nibble (the four most significant bits)
+/// and the lower nibble (the four least significant bits).
+///
+/// Example usage:
+/// ```swift
+/// let byte: UInt8 = 0xAB
+/// let nibbles = getNibbles(from: byte)
+/// print(nibbles) // Output: [10, 11]
+/// ```
+///
+/// - Parameter byte: The byte to be split into nibbles.
+/// - Returns: An array containing the upper nibble and the lower nibble as separate `UInt8` values.
+///
+/// - Complexity: O(1).
+///
+/// - Author: Lee Barney
+/// - Version: 0.9
 func getNibbles(from byte: UInt8) -> [UInt8] {
     let upperNibble = byte >> 4
     let lowerNibble = byte & 0x0F
     return [upperNibble, lowerNibble]
 }
 
+/// Decodes the distribution header from the provided data.
+///
+/// This function reads and processes the distribution header, extracting the atom cache reference indexes,
+/// flags, and the remaining data. It handles normal distribution types and logs errors or traces for unsupported types.
+///
+/// Example usage:
+/// ```swift
+/// if let (cacheRefIndexes, flags, remainingData) = decodeDistributionHeader(data: headerData, uuid: "unique-uuid", connection: connection, status: status, logger: logger) {
+///     // Process the decoded header information
+/// }
+/// ```
+///
+/// - Parameters:
+///   - data: The data containing the distribution header.
+///   - uuid: A unique identifier for the connection, used for logging.
+///   - connection: The network connection associated with the data.
+///   - status: The status of the connection.
+///   - logger: An optional logger for tracing and error logging.
+/// - Returns: A tuple containing the atom cache reference indexes, flags, and the remaining data, or `nil` if decoding fails.
+///
+/// - Complexity: O(n), where n is the length of the data being processed.
+///
+/// - Author: Lee Barney
+/// - Version: 0.9
 fileprivate func decodeDistributionHeader(data:Data, uuid:String, connection:NWConnection, status:Status, logger:Logger?)->([AtomCacheRefIndex],[Byte],Data)?{
     guard let headerIndicator = data.first, headerIndicator == 131 else{
         logger?.error("connection \(uuid) bad distribution header")
@@ -604,9 +740,30 @@ fileprivate func decodeDistributionHeader(data:Data, uuid:String, connection:NWC
     default:
         return nil
     }
-    return nil
 }
 
+/// Decodes a control message from the provided data.
+///
+/// This function reads and processes a control message from the provided data. The control message must be an encoded tuple,
+/// as indicated by the initial byte (104). The function extracts the control message's operation type and handles different
+/// cases accordingly. Unsupported or unrecognized operation types are logged as errors.
+///
+/// Example usage:
+/// ```swift
+/// let (result, remainingData) = decodeControlMessage(data: messageData, uuid: "unique-uuid", logger: logger)
+/// ```
+///
+/// - Parameters:
+///   - data: The data containing the control message.
+///   - uuid: A unique identifier for the connection, used for logging.
+///   - logger: An optional logger for tracing and error logging.
+/// - Returns: A tuple containing an optional result (which can be a tuple of any type and a UInt8 indicating the operation type) and the remaining data.
+///            If the control message is invalid or unsupported, the result will be `nil`.
+///
+/// - Complexity: O(n), where n is the length of the data being processed.
+///
+/// - Author: Lee Barney
+/// - Version: 0.9
 func decodeControlMessage(data: Data, uuid: String, logger: Logger?)->((Any,UInt8)?,Data){
     guard data.firstByte == 104 else {//the control message must always be an encoded tuple according to the documentation.
         logger?.error("\(uuid) bad control message expected 104 got \(data.firstByte)")
@@ -620,105 +777,136 @@ func decodeControlMessage(data: Data, uuid: String, logger: Logger?)->((Any,UInt
         return (nil,data)
     }
     remainingData.removeFirst()
-    for _ in 0..<controlArity{
-        let operationType = remainingData.firstByte
-        remainingData.removeFirst()
-        switch operationType {
-        case ERL.LINK:
-            //the next two items are FromPid and ToPid
-            return (nil,remainingData)//place holder code
-        case ERL.SEND:
-            //the next two items are Unused and ToPid
-            return (nil,remainingData)//place holder code
-        case ERL.EXIT:
-            //the next three items are FromPid, ToPid, and Reason
-            return (nil,remainingData)//place holder code
-            //case ERL.UNLINK://(Obsolete)
-        case ERL.NODE_LINK:
-            return ((5,ERL.NODE_LINK),remainingData)
-        case ERL.REG_SEND:
-            //the next three items are FromPid, Unused, and ToName
-            guard let result = remainingData.fromNewPidExt else{
-                logger?.error("\(uuid) unable to generate pid from \(remainingData)")
-                return (nil,remainingData)
-            }
-            return ((result,ERL.REG_SEND),remainingData)
-        case ERL.GROUP_LEADER:
-            //the next two items are FromPid and ToPid
-            return (nil,remainingData)//place holder code
-        case ERL.EXIT2:
-            //the next two items are FromPid and ToPid
-            return (nil,remainingData)//place holder code
-        case ERL.SEND_TT:
-            //the next three items are Unused, ToPid, TraceToken
-            return (nil,remainingData)//place holder code
-        case ERL.EXIT_TT:
-            //the next four items are FromPid, ToPid, TraceToken, and Reason
-            return (nil,remainingData)//place holder code
-        case ERL.REG_SEND_TT:
-            //the next four items are FromPid, Unused, ToName, and TraceToken
-            return (nil,remainingData)//place holder code
-        case ERL.EXIT2_TT:
-            //the next four items are FromPid, ToPid, TraceToken, Reason
-            return (nil,remainingData)//place holder code
-        case ERL.MONITOR_P:
-            //the next three items are FromPid, ToProc, Ref
-            return (nil,remainingData)//place holder code
-        case ERL.DEMONITOR_P:
-            //the next three items are FromPid, ToProc, Ref
-            return (nil,remainingData)//place holder code
-        case ERL.MONITOR_P_EXIT:
-            //the next four items are FromProc, ToPid, Ref, Reason
-            return (nil,remainingData)//place holder code
-        case ERL.SEND_SENDER:
-            //the next two items are FromPId, ToPid
-            return (nil,remainingData)//place holder code
-        case ERL.SEND_SENDER_TT:
-            //the next three items are FromPid, ToPid, TraceToken
-            return (nil,remainingData)//place holder code
-        case ERL.PAYLOAD_EXIT:
-            //the next two items are FromPid, ToPid
-            return (nil,remainingData)//place holder code
-        case ERL.PAYLOAD_EXIT_TT:
-            //the next three items are FromPid, ToPid, TraceToken
-            return (nil,remainingData)//place holder code
-        case ERL.PAYLOAD_EXIT2:
-            //the next two items are FromPid, ToPid
-            return (nil,remainingData)//place holder code
-        case ERL.PAYLOAD_EXIT2_TT:
-            //the next three items are FromPid, ToPid, TraceToken
-            return (nil,remainingData)//place holder code
-        case ERL.PAYLOAD_MONITOR_P_EXIT:
-            //the next three items are FromProc, ToPid, Ref
-            return (nil,remainingData)//place holder code
-        case ERL.SPAWN_REQUEST:
-            //the next five items are ReqId, From, GroupLeader, {Module, Function, Arity}, OptList
-            return (nil,remainingData)//place holder code
-        case ERL.SPAWN_REQUEST_TT:
-            //the next six items are ReqId, From, GroupLeader, {Module, Function, Arity}, OptList, TraceToken
-            return (nil,remainingData)//place holder code
-        case ERL.SPAWN_REPLY:
-            //the next four items are ReqId, To, Flags, Result
-            return (nil,remainingData)//place holder code
-        case ERL.SPAWN_REPLY_TT:
-            //the next five items are ReqId, To, Flags, Result, TraceToken
-            return (nil,remainingData)//place holder code
-        case ERL.UNLINK_ID:
-            //the next three items are Id, FromPid, ToPid
-            return (nil,remainingData)//place holder code
-        case ERL.UNLINK_ID_ACK:
-            //the next three items are Id, FromPid, ToPid
-            return (nil,remainingData)//place holder code
-        case ERL.ALIAS_SEND:
-            //the next two items are FromPid, Alias
-            return (nil,remainingData)//place holder code
-        case ERL.ALIAS_SEND_TT:
-            //the next three items are FromPid, Alias, TraceToken
-            return (nil,remainingData)//place holder code
-        default:
-            logger?.error("Unknown Control Message Type \(operationType)")
+    let operationType = remainingData.firstByte
+    remainingData.removeFirst()
+    switch operationType {
+    case ERL.LINK:
+        //the next two items are FromPid and ToPid
+        return (nil,remainingData)//place holder code
+    case ERL.SEND:
+        //the next two items are Unused and ToPid
+        return (nil,remainingData)//place holder code
+    case ERL.EXIT:
+        //the next three items are FromPid, ToPid, and Reason
+        return (nil,remainingData)//place holder code
+        //case ERL.UNLINK://(Obsolete)
+    case ERL.NODE_LINK:
+        return ((5,ERL.NODE_LINK),remainingData)
+    case ERL.REG_SEND:
+        guard controlArity == 4 else{
+            logger?.error("\(uuid) invalid arity \(controlArity) for REG_SEND")
             return (nil,remainingData)
         }
+        guard let indicator = remainingData.first, indicator == 88 else{
+            logger?.error("\(uuid) expected pid id from \(remainingData)")
+            return (nil,remainingData)
+        }
+        remainingData.removeFirst()
+        //the next three items are FromPid, Unused, and ToName
+        guard let result = remainingData.fromNewPidExt else{
+            logger?.error("\(uuid) unable to generate pid from \(remainingData)")
+            return (nil,remainingData)
+        }
+        let ((fromPid, fromNodeName), receivedData) = result
+        remainingData = receivedData
+        guard let unusedIndicator = remainingData.first, unusedIndicator == 82 else{//unused to maintain backwards compatability with older versions of distribution protocol
+            logger?.error("\(uuid) missing backwards compatibilty padding in \(remainingData)")
+            return (nil,remainingData)
+        }
+        remainingData.removeFirst(2)
+        
+        guard let fromAtomIndicator = remainingData.first, fromAtomIndicator == 82 else{//used to indicate the name atom of the requesting node.
+            logger?.error("\(uuid) missing from node atom cache reference in \(remainingData.bytes)")
+            return (nil,remainingData)
+        }
+        remainingData.removeFirst()
+        let atomCacheRef = remainingData.firstByte
+        let (found,cachedValue) = "atom_cache" ! (SafeDictCommand.get,atomCacheRef)
+        var nodeName = "nil"
+        if found == .ok {
+            guard let asString = cachedValue as? String else{
+                logger?.error("\(uuid) got bad stored cached atom \(String(describing: cachedValue)) using reference \(atomCacheRef)")
+                return (nil,remainingData)
+            }
+            nodeName = asString
+        }
+        logger?.trace("\(uuid) regsend request result is \((((fromPid,nodeName),ERL.REG_SEND),remainingData))")
+        return (((fromPid,nodeName),ERL.REG_SEND),remainingData)
+    case ERL.GROUP_LEADER:
+        //the next two items are FromPid and ToPid
+        return (nil,remainingData)//place holder code
+    case ERL.EXIT2:
+        //the next two items are FromPid and ToPid
+        return (nil,remainingData)//place holder code
+    case ERL.SEND_TT:
+        //the next three items are Unused, ToPid, TraceToken
+        return (nil,remainingData)//place holder code
+    case ERL.EXIT_TT:
+        //the next four items are FromPid, ToPid, TraceToken, and Reason
+        return (nil,remainingData)//place holder code
+    case ERL.REG_SEND_TT:
+        //the next four items are FromPid, Unused, ToName, and TraceToken
+        return (nil,remainingData)//place holder code
+    case ERL.EXIT2_TT:
+        //the next four items are FromPid, ToPid, TraceToken, Reason
+        return (nil,remainingData)//place holder code
+    case ERL.MONITOR_P:
+        //the next three items are FromPid, ToProc, Ref
+        return (nil,remainingData)//place holder code
+    case ERL.DEMONITOR_P:
+        //the next three items are FromPid, ToProc, Ref
+        return (nil,remainingData)//place holder code
+    case ERL.MONITOR_P_EXIT:
+        //the next four items are FromProc, ToPid, Ref, Reason
+        return (nil,remainingData)//place holder code
+    case ERL.SEND_SENDER:
+        //the next two items are FromPId, ToPid
+        return (nil,remainingData)//place holder code
+    case ERL.SEND_SENDER_TT:
+        //the next three items are FromPid, ToPid, TraceToken
+        return (nil,remainingData)//place holder code
+    case ERL.PAYLOAD_EXIT:
+        //the next two items are FromPid, ToPid
+        return (nil,remainingData)//place holder code
+    case ERL.PAYLOAD_EXIT_TT:
+        //the next three items are FromPid, ToPid, TraceToken
+        return (nil,remainingData)//place holder code
+    case ERL.PAYLOAD_EXIT2:
+        //the next two items are FromPid, ToPid
+        return (nil,remainingData)//place holder code
+    case ERL.PAYLOAD_EXIT2_TT:
+        //the next three items are FromPid, ToPid, TraceToken
+        return (nil,remainingData)//place holder code
+    case ERL.PAYLOAD_MONITOR_P_EXIT:
+        //the next three items are FromProc, ToPid, Ref
+        return (nil,remainingData)//place holder code
+    case ERL.SPAWN_REQUEST:
+        //the next five items are ReqId, From, GroupLeader, {Module, Function, Arity}, OptList
+        return (nil,remainingData)//place holder code
+    case ERL.SPAWN_REQUEST_TT:
+        //the next six items are ReqId, From, GroupLeader, {Module, Function, Arity}, OptList, TraceToken
+        return (nil,remainingData)//place holder code
+    case ERL.SPAWN_REPLY:
+        //the next four items are ReqId, To, Flags, Result
+        return (nil,remainingData)//place holder code
+    case ERL.SPAWN_REPLY_TT:
+        //the next five items are ReqId, To, Flags, Result, TraceToken
+        return (nil,remainingData)//place holder code
+    case ERL.UNLINK_ID:
+        //the next three items are Id, FromPid, ToPid
+        return (nil,remainingData)//place holder code
+    case ERL.UNLINK_ID_ACK:
+        //the next three items are Id, FromPid, ToPid
+        return (nil,remainingData)//place holder code
+    case ERL.ALIAS_SEND:
+        //the next two items are FromPid, Alias
+        return (nil,remainingData)//place holder code
+    case ERL.ALIAS_SEND_TT:
+        //the next three items are FromPid, Alias, TraceToken
+        return (nil,remainingData)//place holder code
+    default:
+        logger?.error("Unknown Control Message Type \(operationType)")
+        return (nil,remainingData)
     }
     return (nil,data)
 }

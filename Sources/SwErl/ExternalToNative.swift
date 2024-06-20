@@ -420,11 +420,15 @@ extension Data {
             var remainingData = self.dropFirst()
             var nodeAtom:SwErlAtom? = nil
             if atomTypeIdicator == 82{//ATOM_CACHE_REF
-                guard let atomCacheRef = self.first else {
+                guard let atomCacheRef = remainingData.first else {
                     return nil
                 }
                 remainingData.removeFirst()
-                let (found,name) = "atom_cache" ! (SafeDictCommand.get,atomCacheRef)
+                var (found, name): (SwErlPassed, Any?) = (.ok, "nil")
+
+                if atomCacheRef != 0 {
+                    (found, name) = "atom_cache" ! (SafeDictCommand.get, atomCacheRef)
+                }
                 guard found == SwErlPassed.ok, let name = name as? String else{
                     return nil
                 }
