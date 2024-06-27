@@ -30,14 +30,14 @@ final class NodeTests: XCTestCase {
         try buildSafe(dictionary: [String:Date](), named: "activity_cache")
         var logger = Logger(label: "epmdLogger")
         logger.logLevel = .trace
-        startEPMD(logger:logger)//use defaults
+        EPMD.start(logger:logger)//use defaults
         var nodeLogger = Logger(label: "nodeLogger")
         nodeLogger.logLevel = .trace
         startReceiver(name: "bob@\(getLocalHostName()).local", cookie: "cook",logger: nodeLogger)
         RunLoop.current.run()
     }
     func testLocalNetADMNames() throws{
-        startEPMD()//use defaults
+        EPMD.start()//use defaults
         startReceiver(name: "bob)", cookie: "cook")
         startReceiver(name: "fred)", cookie: "cook")
         startReceiver(name: "sue)", cookie: "cook")

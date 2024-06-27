@@ -241,7 +241,6 @@ func doHandshake(uuid:String,localNodeName:String, cookie:String,data:Data,conne
         return
     }
     let remoteStatus = Status(capabilities: capabilityFlags, creation: remoteCreation, connection: connection)
-    //TODO: start this safe dictionary in the startNode function along with calling startReceiver
     "remoteStatusTracker" ! (SafeDictCommand.add,remoteNodeName,remoteStatus)
     guard var responseData = "ok".data(using: .utf8) else{
         return
@@ -320,10 +319,6 @@ func doHandshake(uuid:String,localNodeName:String, cookie:String,data:Data,conne
                         logger?.error("\(uuid) missing its activity cache")
                         return
                     }
-//                    if Date().timeIntervalSince(last) >= 60{
-//                        logger?.trace("\(uuid) cancelling due to inactivity")
-//                        connection.cancel()
-//                    }
                 }
                 doRPCResponse(uuid:uuid, connection:connection, status:remoteStatus, logger: logger)
             })
@@ -543,25 +538,14 @@ fileprivate func readNormalMessage(connection:NWConnection, message:Data, ofLeng
                 switch aState {
                 case .ready:
                     logger?.trace("Client connected. Assigned UUID \(uuid) to node name \(name)")
-                    
                 case .failed(let error):
                     logger?.trace("connection \(uuid) connection failed: \(error)")
                     "atom_cache" ! (SafeDictCommand.remove,uuid)
                     "connection_cache" ! (SafeDictCommand.remove, name)
-                    connection.cancel()
                 case .cancelled:
                     logger?.trace("connection \(uuid) connection cancelled.")
                     "atom_cache" ! (SafeDictCommand.remove,uuid)
                     "connection_cache" ! (SafeDictCommand.remove, name)
-                    
-                    //remove the cached values for the 60 second activity limit timer for this connection.
-                    guard case let (SwErlPassed.ok, trackers) = "tick_activity_timer_cache" ! (SafeDictCommand.get, uuid), let (tickTracker,activityTracker) = trackers as? (DispatchSourceTimer,DispatchSourceTimer) else{
-                        logger?.error("\(uuid) unable to find activity and tick tracker. Activity tracker and timer not removed from caches.")
-                        return
-                    }
-                    tickTracker.cancel()
-                    activityTracker.cancel()
-                    "tick_activity_timer_cache" ! (SafeDictCommand.remove, uuid)
                 default:
                     logger?.trace("connection \(uuid) connection in unrecognized state \(aState)")
                     break

@@ -96,14 +96,16 @@ enum Node{
     /// - Version: 0.9
     static func spawn(using conduit:ExchangeProtocol = .tcp, name:String, cookie:String, epmdPort:UInt16 = 4369, EPMDLogger:Logger? = nil, interNodeLogger:Logger? = nil){
         //start EPMD if none exists
-        startEPMD(using:conduit, on:epmdPort, logger:EPMDLogger)
+        EPMD.start(using:conduit, on:epmdPort, logger:EPMDLogger)
         //start Cache Dictionaries
         do{
             try buildSafe(dictionary: [String:NodePairAtomCache](), named: "atom_cache")
             try buildSafe(dictionary: [String:NWConnection](), named: "connection_cache")
             try buildSafe(dictionary: [String:Date](), named: "activity_cache")
         }
-        catch{}
+        catch{
+            return
+        }
         //start Remote Proceedure Receiver
         startReceiver(using:conduit, name:name, cookie:cookie, epmdPort:epmdPort, logger:interNodeLogger)
         

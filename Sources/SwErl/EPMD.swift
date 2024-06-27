@@ -80,106 +80,7 @@ struct NodeAlive{
     let nodeName:SwErlAtom
     let extra:Data
 }
-/// Starts the Erlang Port Mapper Daemon (EPMD) process with the specified configurations.
-/// This function initializes various subsystems for tracking node names, node aliveness, address mapping, and UUID-to-name mapping. It then listens for incoming connections on the specified port to handle Erlang node registration, unregistration, and queries. The function ensures thread safety for all operations on the tracking data structures.
-/// - Parameters:
-///   - conduitType: The exchange protocol used for communication, defaults to .tcp.
-///   - port: The port on which the EPMD should listen for incoming connections, defaults to 4369.
-///   - logger: An optional `Logger` for emitting log messages during operation.
-/// - Throws: An error if any part of the initialization or network listening fails.
-///
-/// - Complexity: O(1) for starting the service, but actual runtime will depend on the number of operations performed by the spawned systems and the handling of incoming network connections.
-///
-/// - Author: Lee S. Barney
-/// - Version: 0.1
 
-public func startEPMD(using conduitType:ExchangeProtocol = .tcp, on port:UInt16 = 4369, logger:Logger? = nil){
-    do{
-        //Spawn the thread-safe dictionaries used to track the data required by EPMD.
-        try buildSafe(dictionary: [String:UInt32](), named: "nameCreationTracker")
-        try buildSafe(dictionary: [String:NodeAlive](), named: "nameNodeAliveTracker")
-        try buildSafe(dictionary: [String:String](), named: "nameAddressTracker")
-        try buildSafe(dictionary: [String:String](), named: "UUIDNameTracker")
-        
-        try initializeCreationStream()
-        
-        let connectionListener = try NWListener(using:conduitType, on: 4369)
-        connectionListener.stateUpdateHandler = { newState in
-            switch newState {
-            case .ready:
-                logger?.trace("EPMD ready to accept connections.")
-            case .failed(let error):
-                logger?.error("EPMD failed: \(error)")
-            default:
-                break
-            }
-        }
-        connectionListener.newConnectionHandler = { aConnection in
-            let uuid = UUID().uuidString
-            aConnection.stateUpdateHandler = { aState in
-                print("state: \(aState)")
-                switch aState {
-                case .ready:
-                    logger?.trace("Client connected. Assigned UUID \(uuid)")
-                    //this part runs on a thread from the .global() dispatch queue
-                    aConnection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, context, _, error in
-                        logger?.trace("\(uuid) receiving data")
-                        if let data = data, !data.isEmpty {
-                            logger?.trace("\(uuid) received \(Array(data)) data")
-                            guard let (requestType,responseData) = dealWithRequest(data:data, uuid: uuid, logger: logger, epmdPort: port) as? (UInt16,Data) else{
-                                logger?.error("\(uuid) Unable to build response.")
-                                //send nothing so a timeout happens on the remote
-                                return
-                                
-                            }
-                            
-                            logger?.trace("\(uuid) sending response \(Array(responseData))")
-                            aConnection.send(content: responseData, completion: NWConnection.SendCompletion.contentProcessed { error in
-                                logger?.trace("\(uuid) response sent.")
-                                if requestType == 120{//keep connection open until remote terminates
-                                    aConnection.waitForTermination(logger: logger, uuid: uuid)
-                                }
-                                else{
-                                    aConnection.cancel()
-                                }
-                            })
-                            
-                        }
-                    }
-                case .failed(let error):
-                    logger?.trace("!!!!!!!!!!!!!!!!!!!\(uuid) connection failed: \(error)")
-                    //clean up node alive record if the connection
-                    //is the one used to originally store the
-                    //NodeAlive data.
-                    guard let (_,name) = ("UUIDNameTracker" ! (SafeDictCommand.get,uuid)) as? (SwErlPassed,String) else{
-                        logger?.trace("\(uuid) connection not found in uuid-name tracker.")
-                        return
-                    }
-                    "nameNodeAliveTracker" ! (Tracker.remove, name)
-                    
-                case .cancelled:
-                    logger?.trace("\(uuid) EPMD connection canceled")
-                    //clean up node alive record if the connection
-                    //is the one used to originally store the
-                    //NodeAlive data.
-                    guard let (_,name) = ("UUIDNameTracker" ! (SafeDictCommand.get,uuid)) as? (SwErlPassed,String) else{
-                        logger?.trace("\(uuid) connection not found in uuid-name tracker.")
-                        return
-                    }
-                    "nameNodeAliveTracker" ! (SafeDictCommand.remove, name)
-                default:
-                    logger?.trace("connection state changed to \(aState)")
-                    break
-                }
-            }
-            aConnection.start(queue: .global())
-        }
-        connectionListener.start(queue: .global())
-    }
-    catch{
-        logger?.error("unable to start EPMD. \(error)")
-    }
-}
 /// Initializes the creation number generator stream for Erlang node identifiers.
 /// This function sets up a system process named `creation_generator` that produces unique, sequential creation numbers starting from a random point. These numbers are used as part of the node identifier in an Erlang distributed system to ensure each node gets a unique identifier. The creation numbers are unsigned 32-bit integers, starting from a random number greater than 4, to mimic Erlang's behavior. The stream has a period of 4,294,967,291, after which it wraps around.
 /// The function ensures that each generated creation number is unique across the device by checking against currently active processes and adjusts the starting point if necessary.
@@ -239,10 +140,35 @@ fileprivate func initializeCreationStream(logger:Logger? = nil) throws {
 /// - Author: Lee S. Barney
 /// - Version: 0.1
 
-fileprivate func dealWithRequest(data:Data?, uuid:String, logger:Logger?, epmdPort:UInt16) -> (UInt16,Data?){
-    if let data = data, data.count >= 3 {
+fileprivate func dealWithRequest(data:Data?, uuid:String, epmdPort:UInt16, logger:Logger?) -> (UInt16,Data?){
+    if let data = data, data.count == 2, data.firstByte == 1, data[1] == 107{
+        logger?.trace("connection \(uuid) requests killing the EPMD")
+        guard let nameCreationPid = Registrar.getPid(forName: "nameCreationTracker") else{
+            logger?.error("\(uuid) unable to kill EPMD. No 'nameCreationTracker' process found")
+            return ((107,nil))
+        }
+        guard let nameAddressPid = Registrar.getPid(forName: "nameAddressTracker") else{
+            logger?.error("\(uuid) unable to kill EPMD. No 'nameAddressTracker' process found")
+            return ((107,nil))
+        }
+        guard let nameAlivePid = Registrar.getPid(forName: "nameNodeAliveTracker") else{
+            logger?.error("\(uuid) unable to kill EPMD. No 'nameNodeAliveTracker' process found")
+            return ((107,nil))
+        }
+        guard let uuidNamePid = Registrar.getPid(forName: "UUIDNameTracker") else{
+            logger?.error("\(uuid) unable to kill EPMD. No 'UUIDNameTracker' process found")
+            return ((107,nil))
+        }
+        logger?.trace("\(uuid) terminating EPMD tracker processes")
+        Registrar.unlink(nameCreationPid)
+        Registrar.unlink(nameAddressPid)
+        Registrar.unlink(nameAlivePid)
+        Registrar.unlink(uuidNamePid)
+        return (107,"OK".data(using: .utf8))
+    }
+    else if let data = data, data.count >= 3 {
         logger?.trace("connection \(uuid) did receive data: \(data.bytes)")
-        var remainingBytes = data.dropFirst(2)
+        var remainingBytes = data.dropFirst(2)//we don't need to know the length
         let indicator = remainingBytes.first!
         remainingBytes = remainingBytes.dropFirst()
         logger?.trace("connection \(uuid) did receive request type: \(indicator)")
@@ -261,7 +187,12 @@ fileprivate func dealWithRequest(data:Data?, uuid:String, logger:Logger?, epmdPo
         }
     }//end of if got good data
     else {
-        logger?.error("Remote connection \(uuid) received unknown request \(String(describing: data))")
+        if let data = data{
+            logger?.error("Remote connection \(uuid) received unknown request \([Byte](data))")
+        }
+        else{
+            logger?.error("Remote connection \(uuid) received a nil request")
+        }
     }
     return (0,nil)
 }
@@ -402,7 +333,7 @@ func doAliveX(data:Data, uuid:String, logger:Logger? = nil) -> Data?{
     guard case (_,nil) = "nameNodeAliveTracker" ! (SafeDictCommand.get,name)else{
         return errorData
     }
-
+    
     remaining = remaining.dropFirst(nameLength)
     let extrasLength = Int(remaining.prefix(2).toMachineByteOrder.toUInt16)
     remaining = remaining.dropFirst(2)
@@ -490,5 +421,268 @@ extension ExchangeProtocol {
         // Check the first protocol in the transport protocol stack
         // This assumes the top-most transport protocol defines the connection type
         return self.defaultProtocolStack.transportProtocol is NWProtocolTCP.Options
+    }
+}
+
+
+public enum EPMD{
+    
+    /// Starts the EPMD (Erlang Port Mapper Daemon) service using the specified conduit type and port.
+    ///
+    /// This function initializes thread-safe dictionaries to track the data required by EPMD, sets up a network listener,
+    /// and handles incoming connections. It logs various states and errors during the process. When the EPMD service is ready,
+    /// it invokes the `onReady` closure if provided.
+    ///
+    /// Example usage:
+    /// ```swift
+    /// Node.start(using: .tcp, on: 4369, logger: logger) {
+    ///     print("EPMD is ready")
+    /// }
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - conduitType: The type of conduit to use for the connection. Defaults to `.tcp`.
+    ///   - port: The port to listen on. Defaults to `4369`.
+    ///   - logger: An optional logger for tracing and error logging. Defaults to `nil`.
+    ///   - onReady: An optional closure that is called when the EPMD service is ready. Defaults to `nil`.
+    ///
+    /// - Complexity: O(1) for setup, O(n) for handling connections and requests, where n is the number of connections.
+    ///
+    /// - Author: Lee Barney
+    /// - Version: 0.91
+    
+    public static func start(using conduitType:ExchangeProtocol = .tcp, on port:UInt16 = 4369, logger:Logger? = nil, onReady:(()->())?=nil){
+        do{
+            //Spawn the thread-safe dictionaries used to track the data required by EPMD.
+            try buildSafe(dictionary: [String:UInt32](), named: "nameCreationTracker")
+            try buildSafe(dictionary: [String:NodeAlive](), named: "nameNodeAliveTracker")
+            try buildSafe(dictionary: [String:String](), named: "nameAddressTracker")
+            try buildSafe(dictionary: [String:String](), named: "UUIDNameTracker")
+            
+            try initializeCreationStream()
+            
+            
+            let connectionListener = try NWListener(using:conduitType, on: 4369)
+            connectionListener.stateUpdateHandler = { newState in
+                switch newState {
+                case .ready:
+                    logger?.trace("EPMD ready to accept connections.")
+                    if let onReady = onReady{
+                        onReady()
+                    }
+                case .failed(let error):
+                    logger?.error("EPMD failed: \(error)")
+                default:
+                    break
+                }
+            }
+            connectionListener.newConnectionHandler = { aConnection in
+                let uuid = UUID().uuidString
+                aConnection.stateUpdateHandler = { aState in
+                    print("state: \(aState)")
+                    switch aState {
+                    case .ready:
+                        logger?.trace("Client connected. Assigned UUID \(uuid)")
+                        //this part runs on a thread from the .global() dispatch queue
+                        aConnection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { data, context, _, error in
+                            logger?.trace("\(uuid) receiving data")
+                            if let data = data, !data.isEmpty {
+                                logger?.trace("\(uuid) received \(Array(data)) data")
+                                guard let (requestType,responseData) = dealWithRequest(data:data, uuid: uuid, epmdPort: port, logger: logger) as? (UInt16,Data) else{
+                                    logger?.error("\(uuid) Unable to build response.")
+                                    //send nothing so a timeout happens on the remote
+                                    return
+                                    
+                                }
+                                
+                                logger?.trace("\(uuid) sending response \(Array(responseData))")
+                                aConnection.send(content: responseData, completion: NWConnection.SendCompletion.contentProcessed { error in
+                                    logger?.trace("\(uuid) response sent.")
+                                    if requestType == 120{//keep connection open until remote terminates
+                                        aConnection.waitForTermination(logger: logger, uuid: uuid)
+                                    }
+                                    if requestType == 107{//kill EPMD
+                                        connectionListener.cancel()
+                                    }
+                                    else{
+                                        aConnection.cancel()
+                                    }
+                                })
+                                
+                            }
+                        }
+                    case .failed(let error):
+                        logger?.trace("!!!!!!!!!!!!!!!!!!!\(uuid) connection failed: \(error)")
+                        //clean up node alive record if the connection
+                        //is the one used to originally store the
+                        //NodeAlive data.
+                        guard let (_,name) = ("UUIDNameTracker" ! (SafeDictCommand.get,uuid)) as? (SwErlPassed,String) else{
+                            logger?.trace("\(uuid) connection not found in uuid-name tracker.")
+                            return
+                        }
+                        "nameNodeAliveTracker" ! (Tracker.remove, name)
+                        
+                    case .cancelled:
+                        logger?.trace("\(uuid) EPMD connection canceled")
+                        //clean up node alive record if the connection
+                        //is the one used to originally store the
+                        //NodeAlive data.
+                        guard let (_,name) = ("UUIDNameTracker" ! (SafeDictCommand.get,uuid)) as? (SwErlPassed,String) else{
+                            logger?.trace("\(uuid) connection not found in uuid-name tracker.")
+                            return
+                        }
+                        "nameNodeAliveTracker" ! (SafeDictCommand.remove, name)
+                    default:
+                        logger?.trace("connection state changed to \(aState)")
+                        break
+                    }
+                }
+                aConnection.start(queue: .global())
+            }
+            connectionListener.start(queue: .global())
+        }
+        catch{
+            logger?.error("unable to start EPMD. \(error)")
+        }
+    }
+    
+    
+    /// Requests the port number of any accessable node with an EPMD (Erlang Port Mapper Daemon).
+    ///
+    /// This function sends a "port please" request to the EPMD server of the specified host and retrieves the port number
+    /// and version information of the remote node. It establishes a network connection, sends the request, and waits for
+    /// the response. The result includes the port number and a fixed version of 6 if the request is successful.
+    ///
+    /// Example usage:
+    /// ```swift
+    /// if let (port, version) = EPMD.portPlease(name: "nodeName", host: "hostname") {
+    ///     print("Port: \(port), Version: \(version)")
+    /// }
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - name: The name of the node to request the port number for.
+    ///   - host: The host name or ip address of the EPMD server.
+    ///   - epmdPort: The port of the EPMD server. Defaults to `4369`.
+    ///   - logger: An optional logger for tracing and error logging. Defaults to `nil`.
+    /// - Returns: A tuple containing the port number and version (UInt16, UInt8) if the request is successful, or `nil` otherwise.
+    ///
+    /// - Complexity: O(n), where n is the length of the response data being processed.
+    ///
+    /// - Author: Lee Barney
+    /// - Version: 0.9
+    static func portPlease(name:String, host:String, epmdPort:UInt16 = 4369, logger:Logger? = nil)->(UInt16,UInt8)?{
+        var result:(UInt16,UInt8)? = nil
+        guard let nameData = name.data(using: .utf8), nameData.count <= UInt16.max else{
+            logger?.error("invalid name \(name) in portPlease")
+            return result
+        }
+        let host = NWEndpoint.Host(host)
+        let port = NWEndpoint.Port(integerLiteral: epmdPort)
+        
+        let semaphore = DispatchSemaphore(value: 0)
+        // Create the NWConnection
+        let connection = NWConnection(host: host, port: port, using: .tcp)
+        let uuid = UUID().uuidString
+        // Set up the state handler
+        connection.stateUpdateHandler = { state in
+            switch state {
+            case .setup:
+                logger?.trace("\(uuid) in setup state")
+            case .waiting(let error):
+                logger?.error("\(uuid) in waiting got error: \(error)")
+                semaphore.signal()
+            case .preparing:
+                logger?.trace("\(uuid) in preparing staste")
+            case .ready:
+                logger?.trace("\(uuid)  in ready state")
+                // send port please data
+                let messageArray:[Byte] = UInt16(nameData.count + 1).toErlangInterchangeByteOrder.toByteArray + [122] + nameData.bytes
+                connection.send(content: Data(messageArray), completion: .contentProcessed({ error in
+                    if let error = error {
+                        logger?.error("\(uuid) failed sending data: \(error)")
+                        semaphore.signal()
+                    } else {
+                        logger?.trace("\(uuid) sent EPMD data: \(messageArray) ")
+                        // read response
+                        connection.receive(minimumIncompleteLength: 1, maximumLength: 65536) { (responseData, context, isComplete, error) in
+                            if let responseData = responseData, !responseData.isEmpty {
+                                logger?.trace("\(uuid) received PORT_PLEASE response \(Array(responseData))")
+                                guard let responseType = responseData.first, responseType == 119 else{
+                                    logger?.error("\(uuid) got invalid PORT_PLEASE response")
+                                    semaphore.signal()
+                                    return
+                                }
+                                var remainingData = responseData.dropFirst(2)//if we got a 119 type the next item will always be zero, so ignore it.
+                                let remotePortNum = remainingData.prefix(2).toMachineByteOrder.toUInt16
+                                remainingData = remainingData.dropFirst(2)
+                                guard let remoteNodeType = remainingData.first, remoteNodeType == 77 else{
+                                    logger?.info("\(uuid) got invalid node type \(String(describing: remainingData.first))")
+                                    semaphore.signal()
+                                    return
+                                }
+                                remainingData = remainingData.dropFirst()
+                                guard let communicationProtocol = remainingData.first else{
+                                    logger?.error("\(uuid) missing communication protocol: \(responseData)")
+                                    semaphore.signal()
+                                    return
+                                }
+                                remainingData = remainingData.dropFirst()
+                                guard remainingData.count >= 4 else{
+                                    logger?.error("\(uuid) invalid min and max versions: \(responseData)")
+                                    semaphore.signal()
+                                    return
+                                }
+                                
+                                let minVersion = remainingData.prefix(2).toMachineByteOrder.toUInt16
+                                remainingData = remainingData.dropFirst(2)
+                                
+                                let maxVersion = remainingData.prefix(2).toMachineByteOrder.toUInt16
+                                remainingData = remainingData.dropFirst(2)
+                                
+                                guard maxVersion >= 6 else{
+                                    logger?.trace("\(uuid) insufficient maximum version \(maxVersion)")
+                                    semaphore.signal()
+                                    return
+                                }
+                                
+                                result = (remotePortNum,6)
+                                semaphore.signal()
+                                let storageData = (minVersion,maxVersion,remoteNodeType,communicationProtocol)
+                                "node_info_cache" ! (SafeDictCommand.add, name, storageData)
+                                guard responseData.count > 2 else{
+                                    logger?.info("\(uuid) received port please failure indicator")
+                                    return
+                                }
+                            }
+                            if let error = error {
+                                logger?.trace("\(uuid) failed to receive data with error: \(error)")
+                                semaphore.signal()
+                            }
+                        }
+                    }
+                }))
+            case .failed(let error):
+                logger?.trace("\(uuid) failed to connect with error: \(error)")
+                connection.cancel()
+                semaphore.signal()
+            case .cancelled:
+                logger?.trace("\(uuid) was cancelled")
+                semaphore.signal()
+            @unknown default:
+                logger?.trace("\(uuid) is in an unknown state")
+                semaphore.signal()
+            }
+        }
+        connection.start(queue: .global())
+        logger?.trace("\(uuid) started")
+        // Wait until data is received or an error occurs
+        semaphore.wait()
+        return result
+    }
+    
+    static func names(host:String, epmdPort:UInt16 = 4369, logger:Logger?=nil)->[(String,UInt16)]{
+        
+        return []
     }
 }
