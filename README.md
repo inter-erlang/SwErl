@@ -1,5 +1,5 @@
 ![SwErl](Sources/SwErl/SwErl.docc/resources/logo_text.svg)
-SwErl is a general purpose concurrency library conforming to the design patterns and principles found in the Erlang Programming Language. SwErl also includes SwErl Node, an as-of-yet incomplete library allowing native Swift to connect to a distributed Erlang system as a near-fully featured node. For Swift Developers with little to no Erlang experience, a quick primer for SwErl [is provided here](Sources/SwErl/SwErl.docc/GettingStarted.md).
+SwErl is a general purpose concurrency library conforming to the design patterns and principles found in the Erlang Programming Language. For Swift Developers with little to no Erlang experience, a quick primer for SwErl [is provided here](Sources/SwErl/SwErl.docc/GettingStarted.md).
 ## Why SwErl?
 
 ### Painless Concurrency
@@ -13,8 +13,6 @@ SwErl also allows you to have processes spawn and terminate other processes. Suc
 ### SwErl Processes are Lightweight
 Each SwErl process is only 88 Bytes in size. Work is ongoing to reduce this size even further. Both stateful and stateless SwErl processes can be spawned quickly. On one developer's first-generation MacStudio, it took less than 0.0005 milliseconds to spawn individual processes and less than 0.00083 milliseconds per message sent. A test exists in the unit tests that allows you to see the speed of SwErl on your devices.
 
-### Erlang Compatibility
-Though not presently implemented, SwErl will allow for seamless communication between Swift Apps and Erlang server code, simplifying client/server relationships and distributed applications.
 ## Installation
 SwErl is available via the Swift Package Manager.
 ```swift
